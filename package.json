@@ -1,24 +1,46 @@
 {
   "name": "tscircuit-deploy",
   "private": true,
+  "description": "Vercel-like deployment platform for tscircuit projects",
+  "version": "1.0.0",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --parallel",
+    "start": "turbo run start --parallel",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "check-types": "turbo run check-types",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "bun run --cwd packages/shared migrate",
+    "db:studio": "bun run --cwd packages/shared studio"
   },
   "devDependencies": {
     "prettier": "^3.6.0",
     "turbo": "^2.5.4",
-    "typescript": "5.8.2"
+    "typescript": "5.8.2",
+    "@types/node": "^20.11.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18",
+    "bun": ">=1.2.15"
   },
   "packageManager": "bun@1.2.15",
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "keywords": [
+    "tscircuit",
+    "deploy",
+    "electronics",
+    "pcb",
+    "github-app",
+    "ci-cd"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tscircuit/tscircuit-deploy.git"
+  },
+  "license": "MIT"
 }

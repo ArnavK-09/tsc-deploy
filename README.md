@@ -1,135 +1,233 @@
-# Turborepo starter
+# tscircuit Deploy
 
-This Turborepo starter is maintained by the Turborepo core team.
+A Vercel-like deployment platform for tscircuit projects with automatic preview builds, semantic versioning, and CI/CD integration.
 
-## Using this example
+## 🚀 Features
 
-Run the following command:
+- **One-click repository connection** with automatic CI/CD setup
+- **Preview deployments** on every pull request with live URLs
+- **Automatic semantic versioning** for main branch releases
+- **Circuit snapshot & diff visualization** using tscircuit semantics
+- **Auditable deployment history** with tamper-proof logs
+- **GitHub App integration** with status checks and PR comments
 
-```sh
-npx create-turbo@latest
+## 📋 Quick Start
+
+### 1. Install the GitHub App
+
+Install the [tscircuit Deploy GitHub App](https://github.com/apps/tscircuit-deploy) and select your repository.
+
+### 2. Add the Workflow
+
+Create `.github/workflows/tscircuit-deploy.yml`:
+
+```yaml
+name: tscircuit Deploy
+on:
+  push:
+    branches: ['main']
+  pull_request:
+
+jobs:
+  tscircuit:
+    permissions: 
+      contents: read
+      pull-requests: write
+      statuses: write
+      checks: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: tscircuit/cli-action@v1
+        with:
+          args: deploy
 ```
 
-## What's inside?
+### 3. Deploy
 
-This Turborepo includes the following packages/apps:
+Commit and push your changes. A **Preview Deploy** link will appear on your PR within a few minutes.
 
-### Apps and Packages
+When you merge to main, tscircuit.com automatically publishes your new package version. 🎉
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## 🏗️ Architecture
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```mermaid
+graph TB
+    A[GitHub Repository] --> B[GitHub App Webhooks]
+    B --> C[Bot Service]
+    C --> D[Build Queue]
+    D --> E[tscircuit CLI]
+    E --> F[Circuit Snapshots]
+    F --> G[Preview Server]
+    
+    C --> H[Database]
+    G --> H
+    
+    I[GitHub Actions] --> J[CLI Action]
+    J --> E
+    
+    K[Pull Request] --> L[Status Checks]
+    K --> M[PR Comments]
+    L --> G
+    M --> G
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+This project consists of:
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+- **`apps/bot/`** - GitHub App webhook handler and build orchestration
+- **`apps/server/`** - Preview deployment server with circuit visualization
+- **`packages/shared/`** - Common types, utilities, and database schema
+- **`packages/github-action/`** - Reusable GitHub Action for CI/CD workflows
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+## 🛠️ Development Setup
 
-### Develop
+### Prerequisites
 
-To develop all apps and packages, run the following command:
+- [Bun](https://bun.sh/) >= 1.2.15
+- [PostgreSQL](https://postgresql.org/) >= 14
+- [GitHub App](https://docs.github.com/en/developers/apps/creating-a-github-app) credentials
 
-```
-cd my-turborepo
+### Installation
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
+```bash
+# Clone the repository
+git clone https://github.com/tscircuit/tscircuit-deploy.git
+cd tscircuit-deploy
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
+# Install dependencies
+bun install
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-### Remote Caching
+### Environment Variables
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+```bash
+# Database
+DATABASE_URL=postgresql://localhost:5432/tscircuit_deploy
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+# GitHub App
+GITHUB_APP_ID=your_app_id
+GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+# Services
+BOT_PORT=3001
+SERVER_PORT=3000
+NODE_ENV=development
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### Database Setup
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+```bash
+# Create database
+createdb tscircuit_deploy
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+# Run migrations (coming soon)
+bun run migrate
 ```
 
-## Useful Links
+### Development
 
-Learn more about the power of Turborepo:
+```bash
+# Start all services in development mode
+bun run dev
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+# Or start individual services
+bun run dev --filter=bot      # GitHub App webhook handler
+bun run dev --filter=server   # Preview deployment server
+```
+
+## 📊 Project Roadmap
+
+### Phase 1: Core Infrastructure ✅
+- [x] Foundational architecture with TypeScript types
+- [x] Database schema with Drizzle ORM
+- [x] GitHub App with webhook handling
+- [x] Basic build service and repository management
+- [x] Preview deployment server with HTML rendering
+
+### Phase 2: CI/CD Pipeline ✅
+- [x] GitHub Action for workflow automation
+- [x] Circuit file detection and validation
+- [x] Semantic version bumping logic
+- [x] Build artifact generation
+- [x] PR status checks and comments
+
+### Phase 3: Enhanced Features (In Progress)
+- [ ] Interactive circuit viewer with WebGL
+- [ ] Snapshot diff visualization with side-by-side comparison
+- [ ] Build caching and optimization
+- [ ] Multi-environment support (dev, staging, prod)
+- [ ] Custom domain support for preview deployments
+
+### Phase 4: Advanced Capabilities (Planned)
+- [ ] Real-time build streaming and logs
+- [ ] Slack/Teams notifications
+- [ ] Branch-level environments
+- [ ] Local-to-cloud development sync
+- [ ] A/B testing for circuit variations
+- [ ] Performance monitoring and analytics
+
+### Phase 5: Enterprise Features (Future)
+- [ ] SSO integration with GitHub Organizations
+- [ ] Advanced access controls and permissions
+- [ ] Audit compliance and security scanning
+- [ ] Multi-cloud deployment support
+- [ ] API rate limiting and quotas
+
+## 🎯 Success Metrics
+
+| Goal | Target | Status |
+|------|--------|--------|
+| One-click repo setup with auto CI/CD | ≥90% success rate on first PR | 🔄 In Development |
+| Preview deploy speed | ≤4 min median build time | 🔄 In Development |
+| Production uptime | ≥99.5% availability | 🔄 In Development |
+| Automatic version selection | ≥95% correct semantic bumps | 🔄 In Development |
+| Historical auditability | 2+ year retention | 🔄 In Development |
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Code Structure
+
+```
+tscircuit-deploy/
+├── apps/
+│   ├── bot/           # GitHub App webhook handler
+│   └── server/        # Preview deployment server
+├── packages/
+│   ├── shared/        # Common utilities and types
+│   └── github-action/ # Reusable GitHub Action
+└── docs/              # Documentation
+```
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests
+4. Run tests: `bun test`
+5. Run linting: `bun run lint`
+6. Commit with conventional commits: `git commit -m 'feat: add amazing feature'`
+7. Push and create a Pull Request
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Vercel](https://vercel.com) for inspiration on deployment UX
+- [tscircuit](https://tscircuit.com) community for feedback and testing
+- [Hono](https://hono.dev) for the excellent TypeScript web framework
+- [Drizzle ORM](https://orm.drizzle.team) for type-safe database operations
+
+---
+
+**Built with ❤️ by the tscircuit community** 
