@@ -2,7 +2,7 @@ import { sel } from "tscircuit"
 import { MCP4725A1T_E_CH } from "./MCP4725A1T_E_CH"
 
 const I2CDACBREAKOUT = () => (
-  <board width="15.24mm" height="15.24mm">
+  <board width="15mm" height="15.24mm">
     <MCP4725A1T_E_CH
       name="U1"
       connections={{
