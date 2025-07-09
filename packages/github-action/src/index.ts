@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { exec } from '@actions/exec';
 import { z } from 'zod';
-import { snapshotProject } from './snapshot-project';
+import { snapshotProject, getSvgPreviews } from './snapshot-project';
 
 const InputSchema = z.object({
   args: z.string().default('deploy'),
@@ -209,6 +209,9 @@ async function handlePullRequest(
       }
     }
 
+    // Get SVG previews if snapshot result is available
+    const svgPreviews = buildResult.snapshotResult ? await getSvgPreviews(buildResult.snapshotResult) : undefined;
+
     const comment = createPRComment({
       deploymentId,
       previewUrl,
@@ -216,6 +219,7 @@ async function handlePullRequest(
       circuitCount: circuitFiles.length,
       status: 'ready',
       commitSha: pullRequest.head.sha,
+      svgPreviews,
     });
 
     await octokit.rest.issues.createComment({
@@ -328,7 +332,7 @@ async function handlePush(
 
   let packageVersion: string | undefined;
   let deploymentUrl: string | undefined;
-  let buildResult: { buildTime: number };
+  let buildResult: { buildTime: number; snapshotResult?: any };
 
   try {
     buildResult = await runTscircuitBuild(inputs, circuitFiles);
@@ -416,7 +420,7 @@ async function findCircuitFiles(workingDirectory: string): Promise<string[]> {
 async function runTscircuitBuild(
   inputs: z.infer<typeof InputSchema>,
   circuitFiles: string[]
-): Promise<{ buildTime: number }> {
+): Promise<{ buildTime: number; snapshotResult?: any }> {
   const startTime = Date.now();
   
   core.info('🔨 Running tscircuit build and snapshot generation...');
@@ -431,13 +435,13 @@ async function runTscircuitBuild(
     
     core.info(`✅ Snapshot generation completed:`);
     core.info(`   • Circuit files found: ${snapshotResult.circuitFiles.length}`);
-    core.info(`   • Snapshots created: ${snapshotResult.snapshotFiles.length}`);
+    core.info(`   • SVG snapshots created: ${snapshotResult.svgFiles.length}`);
     core.info(`   • Build time: ${snapshotResult.buildTime}s`);
     
-    // Log snapshot files for GitHub Actions output
-    if (snapshotResult.snapshotFiles.length > 0) {
-      core.startGroup('📸 Generated Snapshots');
-      snapshotResult.snapshotFiles.forEach(file => {
+    // Log SVG files for GitHub Actions output
+    if (snapshotResult.svgFiles.length > 0) {
+      core.startGroup('📸 Generated SVG Snapshots');
+      snapshotResult.svgFiles.forEach(file => {
         core.info(`  ${file}`);
       });
       core.endGroup();
@@ -445,7 +449,7 @@ async function runTscircuitBuild(
     
     const buildTime = Math.round((Date.now() - startTime) / 1000);
     
-    return { buildTime };
+    return { buildTime, snapshotResult };
     
   } catch (error) {
     const buildTime = Math.round((Date.now() - startTime) / 1000);
@@ -502,6 +506,33 @@ function generateDeploymentId(): string {
   return `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 }
 
+function getSvgPreviewSection(svgPreviews: Array<{
+  name: string;
+  type: 'pcb' | 'schematic' | '3d';
+  svgContent: string;
+  filePath: string;
+}>): string {
+  const previewsToShow = svgPreviews.slice(0, 6);
+  
+  const previewItems = previewsToShow.map(preview => {
+    // Create a safe data URL for the SVG
+    const encodedSvg = Buffer.from(preview.svgContent).toString('base64');
+    const dataUrl = `data:image/svg+xml;base64,${encodedSvg}`;
+    const typeEmoji = preview.type === 'pcb' ? '🟢' : preview.type === 'schematic' ? '📋' : '🎯';
+    
+    return `#### ${typeEmoji} ${preview.name} (${preview.type.toUpperCase()})
+![${preview.name} ${preview.type}](${dataUrl})`;
+  }).join('\n\n');
+  
+  const extraCount = svgPreviews.length > 6 ? `\n\n*...and ${svgPreviews.length - 6} more previews available in the full deployment.*` : '';
+  
+  return `
+### 📸 SVG Preview Snapshots
+
+${previewItems}${extraCount}
+`;
+}
+
 function createPRComment(data: {
   deploymentId: string;
   previewUrl: string;
@@ -509,8 +540,14 @@ function createPRComment(data: {
   circuitCount: number;
   status: string;
   commitSha: string;
+  svgPreviews?: Array<{
+    name: string;
+    type: 'pcb' | 'schematic' | '3d';
+    svgContent: string;
+    filePath: string;
+  }>;
 }): string {
-  const { deploymentId, previewUrl, buildTime, circuitCount, status, commitSha } = data;
+  const { deploymentId, previewUrl, buildTime, circuitCount, status, commitSha, svgPreviews } = data;
   
   const statusEmoji = {
     ready: '✅',
@@ -520,34 +557,46 @@ function createPRComment(data: {
     cancelled: '🚫'
   }[status] || '❓';
 
-  return `## ${statusEmoji} tscircuit Deploy
+  const svgCount = circuitCount * 3; // PCB, Schematic, 3D per circuit
+
+  return `## ${statusEmoji} TSCircuit Deploy Bot
 
 **${status === 'ready' ? 'Preview Deploy' : 'Deployment Status'}**: ${status}
 
 ${status === 'ready' ? `🔗 **Preview URL**: ${previewUrl}` : ''}
 📊 **Circuits Found**: ${circuitCount}
-📸 **Snapshots Generated**: ${circuitCount} files
+📸 **SVG Snapshots**: ${svgCount} files (${circuitCount} × 3 views)
 ⏱️ **Build Time**: ${buildTime}
 🔧 **Commit**: \`${commitSha.substring(0, 7)}\`
 
 ${status === 'ready' ? `
-### What's Included
-- 📸 Circuit snapshots and metadata
-- 🔧 Interactive circuit previews
-- 📋 PCB and schematic views
-- 📊 Component bill of materials
-- 🏭 Manufacturing-ready files
+### 🎨 Circuit Visualizations Generated
 
-### Snapshots Generated
-- Circuit metadata in JSON format
-- Component and connection data
-- Build artifacts and logs
+For each circuit file, we've generated:
+- 🟢 **PCB View** - Physical board layout with components and traces
+- 📋 **Schematic View** - Electrical connections and component symbols  
+- 🎯 **3D View** - Isometric visualization of the assembled board
+
+${svgPreviews && svgPreviews.length > 0 ? getSvgPreviewSection(svgPreviews) : ''}
+
+### 📁 Snapshot Files
+All generated SVG files are stored in \`.tscircuit/snapshots/\`:
+- \`[circuit-name]-pcb.svg\` - PCB layout visualization
+- \`[circuit-name]-schematic.svg\` - Circuit schematic diagram
+- \`[circuit-name]-3d.svg\` - 3D board rendering
+
+### 🚀 What's Included
+- 📸 High-quality SVG circuit visualizations
+- 🔧 Interactive circuit previews
+- 📋 Professional PCB and schematic views
+- 📊 Component layout and connection diagrams
+- 🏭 Manufacturing-ready visualizations
 
 [View deployment details →](${previewUrl}/deployment/${deploymentId})
 ` : ''}
 
 ---
-*Powered by [tscircuit Deploy](https://tscircuit.com) • [View Snapshots](${previewUrl}/snapshots)*`;
+*🤖 Deployed by **TSCircuit Deploy Bot** • [View Snapshots](${previewUrl}/snapshots) • [Documentation](https://docs.tscircuit.com)*`;
 }
 
 async function createGitHubDeployment(
