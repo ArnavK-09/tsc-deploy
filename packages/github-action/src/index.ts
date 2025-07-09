@@ -115,35 +115,32 @@ async function handlePullRequest(
   const deploymentId = generateDeploymentId();
   const previewUrl = `https://${deploymentId}.preview.tscircuit.com`;
 
-  // Create GitHub deployment
-  const deployment = await octokit.rest.repos.createDeployment({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    ref: pullRequest.head.sha,
-    environment: 'preview',
-    description: `Preview deployment for PR #${pullRequest.number}`,
-    auto_merge: false,
-    required_contexts: [],
-    payload: {
-      deploymentId,
-      pullRequestNumber: pullRequest.number,
-      circuitCount: circuitFiles.length,
-    },
-  });
-
+  // Create GitHub deployment (optional - may fail due to permissions)
   let deploymentStatusId: number | undefined;
-
-  // Set deployment status to in_progress (only if deployment was created successfully)
-  if ('id' in deployment.data) {
-    await octokit.rest.repos.createDeploymentStatus({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      deployment_id: deployment.data.id,
-      state: 'in_progress',
-      description: 'Building preview deployment...',
-      log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-    });
-    deploymentStatusId = deployment.data.id;
+  
+  try {
+    deploymentStatusId = await createGitHubDeployment(
+      octokit,
+      context,
+      'preview',
+      pullRequest.head.sha,
+      `Preview deployment for PR #${pullRequest.number}`,
+      {
+        deploymentId,
+        pullRequestNumber: pullRequest.number,
+        circuitCount: circuitFiles.length,
+      }
+    );
+    
+    if (deploymentStatusId) {
+      core.info(`✅ Created GitHub deployment: ${deploymentStatusId}`);
+    } else {
+      core.warning('⚠️ Failed to create GitHub deployment - continuing without deployment tracking');
+    }
+  } catch (error) {
+    core.warning(`⚠️ GitHub deployment creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    core.warning('Continuing without deployment tracking - this may be due to insufficient permissions');
+    deploymentStatusId = undefined;
   }
 
   const checkRun = await octokit.rest.checks.create({
@@ -267,34 +264,32 @@ async function handlePush(
   const deploymentId = generateDeploymentId();
   const environment = (branch === 'main' || branch === 'master') ? 'production' : 'staging';
   
-  // Create GitHub deployment for push events
-  const deployment = await octokit.rest.repos.createDeployment({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    ref: context.sha,
-    environment,
-    description: `Deploy to ${environment} from ${branch}`,
-    auto_merge: false,
-    required_contexts: [],
-    payload: {
-      deploymentId,
-      branch,
-      circuitCount: circuitFiles.length,
-    },
-  });
-
+  // Create GitHub deployment for push events (optional - may fail due to permissions)
   let deploymentStatusId: number | undefined;
   
-  if ('id' in deployment.data) {
-    await octokit.rest.repos.createDeploymentStatus({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      deployment_id: deployment.data.id,
-      state: 'in_progress',
-      description: `Building ${environment} deployment...`,
-      log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-    });
-    deploymentStatusId = deployment.data.id;
+  try {
+    deploymentStatusId = await createGitHubDeployment(
+      octokit,
+      context,
+      environment,
+      context.sha,
+      `Deploy to ${environment} from ${branch}`,
+      {
+        deploymentId,
+        branch,
+        circuitCount: circuitFiles.length,
+      }
+    );
+    
+    if (deploymentStatusId) {
+      core.info(`✅ Created GitHub deployment: ${deploymentStatusId}`);
+    } else {
+      core.warning('⚠️ Failed to create GitHub deployment - continuing without deployment tracking');
+    }
+  } catch (error) {
+    core.warning(`⚠️ GitHub deployment creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    core.warning('Continuing without deployment tracking - this may be due to insufficient permissions');
+    deploymentStatusId = undefined;
   }
 
   let packageVersion: string | undefined;
