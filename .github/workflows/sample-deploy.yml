@@ -24,6 +24,7 @@ jobs:
       - name: Build tscircuit
         working-directory: ./packages/github-action
         run: |
+          bun install
           bun run build
 
       - name: Deploy tscircuit
