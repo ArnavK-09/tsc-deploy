@@ -17,12 +17,15 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
       
       - name: Build tscircuit
         working-directory: ./packages/github-action
         run: |
           bun run build
-          
+
       - name: Deploy tscircuit
         uses: ./packages/github-action
         with:
