@@ -508,9 +508,12 @@ function createDeploymentTable(data: {
     timeZoneName: "short",
   });
 
-  return `| Name | Status | Preview | Circuits | Updated |
+  return `
+## ✨ tscircuit deploy
+
+| Name | Status | Preview | Circuits | Updated |
 | :--- | :----- | :------ | :------- | :------ |
-| **${deploymentId.substring(0, 20)}...** | ${statusDisplay} ([Inspect](${inspectUrl})) | ${status === "ready" ? `[Visit Preview](${previewUrl})` : "—"} | ${circuitCount} files | ${currentTime} |`;
+| **${deploymentId}** | ${statusDisplay} ([Inspect](${inspectUrl})) | ${status === "ready" ? `[Visit Preview](${previewUrl})` : "—"} | ${circuitCount} files | ${currentTime} |`.trim();
 }
 
 function createImagePreviewTable(
@@ -536,7 +539,7 @@ function createImagePreviewTable(
       const pcbCell = `<img src="${encodeURIComponent(pcbSvg || "")}" alt="PCB" width="120" height="80" />`;
       const schematicCell = `<img src="${encodeURIComponent(schematicSvg || "")}" alt="Schematic" width="120" height="80" />`;
 
-      return `| **${circuitName}** | ${pcbCell} | ${schematicCell} |`;
+      return `| **${circuitGroups.get(circuitName)?.[0]?.name}** | ${pcbCell} | ${schematicCell} |`;
     })
     .join("\n");
 
@@ -581,7 +584,7 @@ function generatePRComment(data: {
       ? createImagePreviewTable(snapshotResult.circuitFiles)
       : "";
 
-  return `## 🔌 tscircuit deploy
+  return `
 
 ${deploymentTable}
 
