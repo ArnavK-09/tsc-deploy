@@ -286,13 +286,11 @@ async function runTscircuitBuild(
   core.info('🔨 Running tscircuit build...');
   
   try {
-    // Create a timeout promise
-    const timeoutMs = inputs.timeout * 60 * 1000; // Convert minutes to milliseconds
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutMs = inputs.timeout * 60 * 1000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error(`Build timeout after ${inputs.timeout} minutes`)), timeoutMs);
     });
 
-    // Race between exec and timeout
     await Promise.race([
       exec('tscircuit', [inputs.args], {
         cwd: inputs.workingDirectory,
