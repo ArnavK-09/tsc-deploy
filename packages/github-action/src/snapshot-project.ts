@@ -20,22 +20,6 @@ type GenerateCircuitJsonOptions = {
   saveToFile?: boolean;
 };
 
-/**
- * Generates circuit JSON from a TSCircuit component file
- * Similar to the tscircuit CLI functionality
- */
-export async function generateCircuitJsonStandalone({
-  filePath,
-  outputDir,
-  outputFileName,
-  saveToFile = false,
-}: GenerateCircuitJsonOptions) {
-  // TODO: Implement real CircuitRunner usage
-  throw new Error(
-    "CircuitRunner integration not yet implemented - use mock for now",
-  );
-}
-
 interface SnapshotResult {
   circuitFiles: string[];
   svgFiles: string[];
@@ -43,16 +27,6 @@ interface SnapshotResult {
   buildTime: number;
   success: boolean;
   error?: string;
-}
-
-interface CircuitSnapshot {
-  name: string;
-  pcbSvg: string;
-  schematicSvg: string;
-  threeDSvg: string;
-  pcbPng: string;
-  schematicPng: string;
-  threeDPng: string;
 }
 
 interface SvgPreview {

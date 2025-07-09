@@ -197,8 +197,8 @@ async function handlePullRequest(
           conclusion: "success",
           details_url: previewUrl,
           output: {
-            title: "Preview Deploy Ready",
-            summary: `✅ Successfully built ${circuitFiles.length} circuit${circuitFiles.length === 1 ? "" : "s"} in ${buildResult.buildTime}s`,
+            title: "✅ Preview Deploy Ready",
+            summary: `Successfully built ${circuitFiles.length} circuit${circuitFiles.length === 1 ? "" : "s"} in ${buildResult.buildTime}s`,
             text: `## 🔗 Preview URL\n${previewUrl}\n\n## 📊 Build Details\n- Circuits: ${circuitFiles.length}\n- Build time: ${buildResult.buildTime}s\n- Status: Ready`,
           },
         });
@@ -268,8 +268,8 @@ async function handlePullRequest(
           status: "completed",
           conclusion: "failure",
           output: {
-            title: "Build Failed",
-            summary: `❌ Build failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+            title: "🔴 Build Failed",
+            summary: `Build failed: ${error instanceof Error ? error.message : "Unknown error"}`,
           },
         });
       } catch (checkError) {
@@ -499,7 +499,38 @@ async function runTscircuitBuild(
   }
 }
 
-function createImagePreviewsFromPng(
+function createDeploymentTable(data: {
+  deploymentId: string;
+  previewUrl: string;
+  buildTime: string;
+  circuitCount: number;
+  status: "ready" | "error" | "skipped";
+  commitSha: string;
+}): string {
+  const { deploymentId, previewUrl, buildTime, circuitCount, status, commitSha } = data;
+  
+  const statusDisplay = {
+    ready: "✅ Ready",
+    error: "❌ Failed", 
+    skipped: "⏭️ Skipped"
+  }[status];
+
+  const inspectUrl = `${previewUrl}/inspect`;
+  const currentTime = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric", 
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  });
+
+  return `| Name | Status | Preview | Circuits | Updated |
+| :--- | :----- | :------ | :------- | :------ |
+| **${deploymentId.substring(0, 20)}...** | ${statusDisplay} ([Inspect](${inspectUrl})) | ${status === "ready" ? `[Visit Preview](${previewUrl})` : "—"} | ${circuitCount} files | ${currentTime} |`;
+}
+
+function createImagePreviewTable(
   pngPreviews: Array<{
     name: string;
     type: "pcb" | "schematic" | "3d";
@@ -507,41 +538,58 @@ function createImagePreviewsFromPng(
     svgFilePath: string;
   }>,
 ): string {
-  const previewsToShow = pngPreviews.slice(0, 3);
+  if (!pngPreviews.length) return "";
 
-  const previewItems = previewsToShow
-    .map((preview) => {
+  // Group previews by circuit name
+  const circuitGroups = new Map<string, typeof pngPreviews>();
+  
+  pngPreviews.forEach(preview => {
+    if (!circuitGroups.has(preview.name)) {
+      circuitGroups.set(preview.name, []);
+    }
+    circuitGroups.get(preview.name)!.push(preview);
+  });
+
+  const tableRows = Array.from(circuitGroups.entries()).map(([circuitName, previews]) => {
+    const pcbPreview = previews.find(p => p.type === "pcb");
+    const schematicPreview = previews.find(p => p.type === "schematic");
+    
+    let pcbCell = "—";
+    let schematicCell = "—";
+    
+    if (pcbPreview) {
       try {
-        // Read PNG file and convert to base64 for embedding
-        const pngBuffer = fs.readFileSync(preview.pngFilePath);
+        const pngBuffer = fs.readFileSync(pcbPreview.pngFilePath);
         const base64Png = pngBuffer.toString("base64");
         const dataUrl = `data:image/png;base64,${base64Png}`;
-        const typeEmoji =
-          preview.type === "pcb"
-            ? "🟢"
-            : preview.type === "schematic"
-              ? "📋"
-              : "🎯";
-
-        return `#### ${typeEmoji} ${preview.name} (${preview.type.toUpperCase()})
-![${preview.name} ${preview.type}](${dataUrl})`;
+        pcbCell = `<img src="${"https://registry-api.tscircuit.com/packages/images/ArnavK-09/OPT4048DTSR/pcb.png"}" alt="PCB" width="120" height="80" />`;
       } catch (error) {
-        core.warning(`Failed to read PNG file for preview: ${error}`);
-        return `#### ${preview.name} (${preview.type.toUpperCase()}) - *Preview unavailable*`;
+        core.warning(`Failed to read PCB PNG: ${error}`);
+        pcbCell = "*Error loading image*";
       }
-    })
-    .join("\n\n");
-
-  const extraCount =
-    pngPreviews.length > 3
-      ? `\n\n*...and ${pngPreviews.length - 3} more previews in the deployment.*`
-      : "";
+    }
+    
+    if (schematicPreview) {
+      try {
+        const pngBuffer = fs.readFileSync(schematicPreview.pngFilePath);
+        const base64Png = pngBuffer.toString("base64");
+        const dataUrl = `data:image/png;base64,${base64Png}`;
+        schematicCell = `<img src="${dataUrl}" alt="Schematic" width="120" height="80" />`;
+      } catch (error) {
+        core.warning(`Failed to read Schematic PNG: ${error}`);
+        schematicCell = "*Error loading image*";
+      }
+    }
+    
+    return `| **${circuitName}** | ${pcbCell} | ${schematicCell} |`;
+  }).join("\n");
 
   return `
-### 📸 Circuit Preview Images
+## 📸 Circuit Previews
 
-${previewItems}${extraCount}
-`;
+| Circuit | PCB | Schematic |
+| :------ | :-: | :-------: |
+${tableRows}`;
 }
 
 function createPRComment(data: {
@@ -549,7 +597,7 @@ function createPRComment(data: {
   previewUrl: string;
   buildTime: string;
   circuitCount: number;
-  status: string;
+  status: "ready" | "error" | "skipped";
   commitSha: string;
   svgPreviews?: Array<{
     name: string;
@@ -572,63 +620,30 @@ function createPRComment(data: {
     circuitCount,
     status,
     commitSha,
-    svgPreviews,
     pngPreviews,
   } = data;
 
-  const statusEmoji =
-    {
-      ready: "✅",
-      building: "🔄",
-      error: "❌",
-      pending: "⏳",
-      cancelled: "🚫",
-    }[status] || "❓";
+  const deploymentTable = createDeploymentTable({
+    deploymentId,
+    previewUrl,
+    buildTime,
+    circuitCount,
+    status,
+    commitSha,
+  });
 
-  const svgCount = circuitCount * 3; // PCB, Schematic, 3D per circuit
+  const imagePreviewTable = pngPreviews && pngPreviews.length > 0 
+    ? createImagePreviewTable(pngPreviews) 
+    : "";
 
-  return `## ${statusEmoji} TSCircuit Deploy Bot
+  return `## 🔌 tscircuit deploy
 
-**${status === "ready" ? "Preview Deploy" : "Deployment Status"}**: ${status}
+${deploymentTable}
 
-${status === "ready" ? `🔗 **Preview URL**: ${previewUrl}` : ""}
-📊 **Circuits Found**: ${circuitCount}
-📸 **Image Snapshots**: ${svgCount * 2} files (${circuitCount} × 6 views: SVG + PNG)
-⏱️ **Build Time**: ${buildTime}
-🔧 **Commit**: \`${commitSha.substring(0, 7)}\`
-
-${
-  status === "ready"
-    ? `
-### 🎨 Circuit Visualizations Generated
-
-For each circuit file, we've generated:
-- 🟢 **PCB View** - Physical board layout with components and traces
-- 📋 **Schematic View** - Electrical connections and component symbols  
-- 🎯 **3D View** - Isometric visualization of the assembled board
-
-${pngPreviews && pngPreviews.length > 0 ? createImagePreviewsFromPng(pngPreviews) : ""}
-
-### 📁 Snapshot Files
-All generated files are stored in \`.tscircuit/snapshots/\`:
-- \`[circuit-name]-pcb.svg/.png\` - PCB layout visualization
-- \`[circuit-name]-schematic.svg/.png\` - Circuit schematic diagram
-- \`[circuit-name]-3d.svg/.png\` - 3D board rendering
-
-### 🚀 What's Included
-- 📸 High-quality SVG and PNG circuit visualizations
-- 🔧 Interactive circuit previews with embedded PNG images
-- 📋 Professional PCB and schematic views in multiple formats
-- 📊 Component layout and connection diagrams
-- 🏭 Manufacturing-ready visualizations for download
-
-[View deployment details →](${previewUrl}/deployment/${deploymentId})
-`
-    : ""
-}
+${imagePreviewTable}
 
 ---
-*🤖 Deployed by **TSCircuit Deploy Bot** • [View Snapshots](${previewUrl}/snapshots) • [Documentation](https://docs.tscircuit.com)*`;
+*🤖 Automated deployment by [tscircuit](https://tscircuit.com) • [View Snapshots](${previewUrl}/snapshots)*`;
 }
 
 async function createGitHubDeployment(
