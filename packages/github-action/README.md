@@ -27,11 +27,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
-    permissions:
-      contents: read
-      pull-requests: write
-      deployments: write    # Required for GitHub Deployments API
-      statuses: write       # Required for status updates
+         permissions:
+       contents: read
+       pull-requests: write
+       deployments: write    # For GitHub Deployments API
+       statuses: write       # For status updates
+       checks: write         # For check runs
     
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +87,7 @@ The action requires specific GitHub permissions to function properly:
 ### Optional Permissions (for enhanced features)
 - `deployments: write` - Create GitHub deployments
 - `statuses: write` - Update commit statuses
+- `checks: write` - Create and update check runs
 
 > **Note**: If deployment permissions are not available, the action will continue to work but without GitHub Deployments API integration. You'll see warnings in the logs about permissions.
 
@@ -103,6 +105,7 @@ This error occurs when the GitHub token lacks deployment permissions. Solutions:
      pull-requests: write
      deployments: write
      statuses: write
+     checks: write
    ```
 
 2. **Continue Without Deployments**: The action will automatically fall back to basic functionality without GitHub Deployments API.

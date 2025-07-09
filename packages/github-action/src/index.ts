@@ -143,35 +143,54 @@ async function handlePullRequest(
     deploymentStatusId = undefined;
   }
 
-  const checkRun = await octokit.rest.checks.create({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    name: 'tscircuit Deploy',
-    head_sha: pullRequest.head.sha,
-    status: 'in_progress',
-    details_url: previewUrl,
-    output: {
-      title: 'Building Preview Deploy',
-      summary: `Found ${circuitFiles.length} circuit file${circuitFiles.length === 1 ? '' : 's'}. Starting build...`,
-    },
-  });
+  // Create check run (optional - may fail due to permissions)
+  let checkRunId: number | undefined;
+  
+  try {
+    const checkRun = await octokit.rest.checks.create({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      name: 'tscircuit Deploy',
+      head_sha: pullRequest.head.sha,
+      status: 'in_progress',
+      details_url: previewUrl,
+      output: {
+        title: 'Building Preview Deploy',
+        summary: `Found ${circuitFiles.length} circuit file${circuitFiles.length === 1 ? '' : 's'}. Starting build...`,
+      },
+    });
+    
+    checkRunId = checkRun.data.id;
+    core.info(`✅ Created check run: ${checkRunId}`);
+  } catch (error) {
+    core.warning(`⚠️ Check run creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    core.warning('Continuing without check run - this may be due to insufficient permissions');
+    checkRunId = undefined;
+  }
 
   try {
     const buildResult = await runTscircuitBuild(inputs, circuitFiles);
 
-    await octokit.rest.checks.update({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      check_run_id: checkRun.data.id,
-      status: 'completed',
-      conclusion: 'success',
-      details_url: previewUrl,
-      output: {
-        title: 'Preview Deploy Ready',
-        summary: `✅ Successfully built ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'} in ${buildResult.buildTime}s`,
-        text: `## 🔗 Preview URL\n${previewUrl}\n\n## 📊 Build Details\n- Circuits: ${circuitFiles.length}\n- Build time: ${buildResult.buildTime}s\n- Status: Ready`,
-      },
-    });
+    // Update check run on success (if we created one)
+    if (checkRunId) {
+      try {
+        await octokit.rest.checks.update({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          check_run_id: checkRunId,
+          status: 'completed',
+          conclusion: 'success',
+          details_url: previewUrl,
+          output: {
+            title: 'Preview Deploy Ready',
+            summary: `✅ Successfully built ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'} in ${buildResult.buildTime}s`,
+            text: `## 🔗 Preview URL\n${previewUrl}\n\n## 📊 Build Details\n- Circuits: ${circuitFiles.length}\n- Build time: ${buildResult.buildTime}s\n- Status: Ready`,
+          },
+        });
+      } catch (error) {
+        core.warning(`⚠️ Failed to update check run: ${error}`);
+      }
+    }
 
     // Update deployment status to success
     if (deploymentStatusId) {
@@ -211,28 +230,34 @@ async function handlePullRequest(
     };
 
   } catch (error) {
-    await octokit.rest.checks.update({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      check_run_id: checkRun.data.id,
-      status: 'completed',
-      conclusion: 'failure',
-      output: {
-        title: 'Build Failed',
-        summary: `❌ Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      },
-    });
+    // Update check run on failure (if we created one)
+    if (checkRunId) {
+      try {
+        await octokit.rest.checks.update({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          check_run_id: checkRunId,
+          status: 'completed',
+          conclusion: 'failure',
+          output: {
+            title: 'Build Failed',
+            summary: `❌ Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        });
+      } catch (checkError) {
+        core.warning(`⚠️ Failed to update check run: ${checkError}`);
+      }
+    }
 
     // Update deployment status to failure
     if (deploymentStatusId) {
-      await octokit.rest.repos.createDeploymentStatus({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        deployment_id: deploymentStatusId,
-        state: 'failure',
-        description: `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-      });
+      await updateDeploymentStatus(
+        octokit,
+        context,
+        deploymentStatusId,
+        'failure',
+        `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
 
     throw error;
