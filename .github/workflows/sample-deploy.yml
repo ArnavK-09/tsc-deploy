@@ -18,6 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Build tscircuit
+        working-directory: ./packages/github-action
+        run: |
+          bun run build
+          
       - name: Deploy tscircuit
         uses: ./packages/github-action
         with:
