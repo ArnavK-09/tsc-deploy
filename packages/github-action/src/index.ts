@@ -591,7 +591,7 @@ ${deploymentTable}
 ${imagePreviewTable}
 
 ---
-*🤖 Automated deployment by [tscircuit](https://tscircuit.com) • [View Snapshots](${previewUrl}/snapshots)*`;
+*🤖 Automated deployment by [tscircuit](https://tscircuit.com)*`;
 }
 
 async function createGitHubDeployment(
