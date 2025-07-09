@@ -28,7 +28,7 @@ jobs:
         working-directory: ./packages/github-action
         run: |
           bun install
-          bun run build
+          bun build ./src/index.ts --outdir dist --target bun
 
       - name: Deploy tscircuit
         uses: ./packages/github-action
