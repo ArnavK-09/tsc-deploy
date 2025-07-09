@@ -21,6 +21,7 @@
     "canvas": "^3.1.2",
     "circuit-json-to-simple-3d": "latest",
     "circuit-to-svg": "^0.0.86",
+    "octokit": "^5.0.3",
     "sharp": "^0.33.5",
     "tscircuit": "^0.0.522",
     "ulid": "^3.0.1",

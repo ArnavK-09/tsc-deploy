@@ -5,7 +5,7 @@ import snapshotProject, {
   findCircuitFiles,
   SnapshotResult,
 } from "./snapshot-project";
-import fs from "node:fs";
+import { App } from "octokit";
 import { DEPLOY_URL } from "./constants";
 import { ulid } from "ulid";
 
@@ -31,7 +31,36 @@ async function run(): Promise<void> {
 
     const context = github.context;
     const octokit = github.getOctokit(inputs.githubToken);
-
+    const app = new App({
+      appId: "1546076",
+      privateKey: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAvqIVMeHOySz2DRpa6ySW8wVd4k5xiEt5GYl6q5r8EWhp+HkP
+03G+P3ryuued8e4GEYyKnEVzRVKqgb0nbZs6swvPRVVeCqs78Ps+8M5K4+znB5VM
+hGE1N5Rp2E94brxFzjMHJIWvqML8Mx5Vy5rkEOne5Xg5eVb/WtkS45MtEBL9D/n6
+zJo+4NLc/uuH3PrJC2dOYmXALVA+oaeerh3NR39MKvqo6srWxF7N0a+XDRQ4eVwQ
+0jQkXA4+938ADieyRrUyN3A/o5/NFmM+nF/NPmVCRf2SOIxEzGbIwAxNETpM4bwg
+Kj64xog77Agsb6CIufleeGPNUDrZUsCoHrEcuwIDAQABAoIBAQCbj9iL5CDCuhXv
+i1o2GJ21ouOCEVFET5J67F1WPBsGeZZAVUo82czOMJ5zNx8ElaAOIgnajDIMl/Db
+/md2Yf38rd5uTcN4IVPAysYJ683hQSkmXwcZ39l1iX72LaOxeaHdKnbhrtYxeSwk
+6tRIWhVSWAa0au87vWqT0CBB5ZAYVHpo2pglMb/pj5tlrM7i6JXM0UFdtJOiVqs0
+v255jVyPP/3bfPmJzgeqapvDatzEnsvfJjAB7uBWHlQo/PZ35MDNwLHLLbb0r/s8
+Dn5DmZJEv3GGtRCsrQLCMG2pAqvATa/H34GxE9FrLEyi076ADQqd3jdRrqLTQoNB
+HwH8o8FBAoGBAP4X9R2tFo0z8DTrWFPtBg6VFKJRHW7ti3iaYRictdKmfrCzStC1
+J3DgBcfmm4vdIJLETqd/vljicSxhMYw7cZvfzPb6PiCzTboTSME5q7ZB/MczNg+y
+b3qgK6aAW6vKQVC/5fx1cJrJPbN1qzzsE8+LBf1xyHaYRz5zd/DrIIzNAoGBAMAQ
+PE9H1GUR8oZtrnJltvSk7p3nSHbSReo9JLt8AA5nuuLycjRQaIgzrvcRwzPlpJrN
+luS0/2pCXFf6+VJUjZtPlBmi1Q32c+1ZX4YlIFvsqSszEYlU/c/h7I3F/OPlUHMW
+UC1ajnWczKjJiYrlQsN4gsSN35i6woSuo5L1Ck+nAoGBAIZSeeSPPM22eDQxeYcc
+VMherQLFqK6cas99pPiS11edZnnYviMosMnt04CCexXr9q0/k2jekeyBAFz6oGvG
+fN9u5vZlAXTd9Kf6S8rBxvFZXtybSOfxZxdHFuw1DMD68Z5TY6wbFUTuP2zgNn7F
+Og/MKYV6ogN3qqnr9qroUVO9AoGAKD4+pM4ELvlHu+sXdljhsPkuFl/zyxHcHGyb
+Wb1ttZb+jbcHPvbqMD/EFXjfUex4RQd26o0SR42IE9c+joWw9i4CdiysP7S4La9g
+WJdG5Hv+JlMZBZGNbRWFn18w0f+mj7bJLfefif1E1MkFzNik2JhTriOcCkB3qZ1+
+ILi/ZFkCgYBi7NZmKsg/2ucwz1DlfSBatoNde7o0tKuHCfo8vwpGbmoR+GQ9T5iD
+01bPmcniyTZAvrJl4ZmcfkpMUcFzYFS74KgymJnYA3QsOTo6KihR15Yii3a5BGtl
+59Ew1jcLiewpqyF0+P0bF/reGx9V08u6c+l19qxEvV2zDKWWeRATzw==
+-----END RSA PRIVATE KEY-----`.trim(),
+    });
     core.info(`\n🔌 Starting tscircuit Deploy`);
     core.info(`\tRepository: ${context.repo.owner}/${context.repo.repo}`);
     core.info(`\tEvent: ${context.eventName}`);
@@ -43,7 +72,7 @@ async function run(): Promise<void> {
 
     switch (context.eventName) {
       case "pull_request":
-        deploymentResult = await handlePullRequest(inputs, context, octokit);
+        deploymentResult = await handlePullRequest(inputs, context, octokit, app);
         break;
 
       case "push":
@@ -93,6 +122,7 @@ async function handlePullRequest(
   inputs: z.infer<typeof InputSchema>,
   context: typeof github.context,
   octokit: ReturnType<typeof github.getOctokit>,
+  app: App,
 ): Promise<DeploymentResult> {
   core.info(
     `\n🔄 Processing pull request #${context.payload.pull_request?.number}`,
@@ -223,7 +253,7 @@ async function handlePullRequest(
       }
     }
 
-    const comment = createPRComment({
+    const comment = generatePRComment({
       deploymentId,
       previewUrl,
       buildTime: `${buildResult.buildTime}s`,
@@ -234,6 +264,13 @@ async function handlePullRequest(
     });
 
     await octokit.rest.issues.createComment({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      issue_number: pullRequest.number,
+      body: comment,
+    });
+
+    await app.octokit.rest.issues.createComment({
       owner: context.repo.owner,
       repo: context.repo.repo,
       issue_number: pullRequest.number,
@@ -536,7 +573,7 @@ function createImagePreviewTable(
 ${tableRows}`;
 }
 
-function createPRComment(data: {
+function generatePRComment(data: {
   deploymentId: string;
   previewUrl: string;
   buildTime: string;
