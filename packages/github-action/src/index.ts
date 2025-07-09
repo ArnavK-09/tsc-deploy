@@ -1,44 +1,38 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { exec } from '@actions/exec';
 import { z } from 'zod';
 import { snapshotProject, getSvgPreviews, getPngPreviews } from './snapshot-project';
 import fs from 'node:fs';
+import { randomId } from '@tscircuit-deploy/shared/utils';
+import { DEPLOY_URL } from '@tscircuit-deploy/shared/constants';
 
 const InputSchema = z.object({
-  args: z.string().default('deploy'),
   githubToken: z.string(),
-  deployUrl: z.string().default('https://deploy.tscircuit.com'),
-  timeout: z.string().default('10').transform(val => parseInt(val)),
   workingDirectory: z.string().default('.'),
 });
-
 interface DeploymentResult {
   deploymentId: string;
   previewUrl?: string;
   packageVersion?: string;
   buildTime: number;
   circuitCount: number;
-  status: string;
+  status: 'skipped' | 'ready' | 'error';
 }
 
 async function run(): Promise<void> {
   try {
     const inputs = InputSchema.parse({
-      args: core.getInput('args'),
       githubToken: core.getInput('github-token'),
-      deployUrl: core.getInput('deploy-url'),
-      timeout: core.getInput('timeout'),
       workingDirectory: core.getInput('working-directory'),
     });
 
     const context = github.context;
     const octokit = github.getOctokit(inputs.githubToken);
 
-    core.info(`🔌 Starting tscircuit Deploy`);
-    core.info(`Repository: ${context.repo.owner}/${context.repo.repo}`);
-    core.info(`Event: ${context.eventName}`);
-    core.info(`SHA: ${context.sha}`);
+    core.info(`\n🔌 Starting tscircuit Deploy`);
+    core.info(`\tRepository: ${context.repo.owner}/${context.repo.repo}`);
+    core.info(`\tEvent: ${context.eventName}`);
+    core.info(`\tSHA: ${context.sha}`);
 
     const startTime = Date.now();
 
@@ -71,18 +65,23 @@ async function run(): Promise<void> {
       core.setOutput('package-version', deploymentResult.packageVersion);
     }
 
-    core.info(`✅ Deployment completed successfully`);
+    if(deploymentResult.status === 'skipped') {
+      core.warning(`\n⚠️ No deployment was created`);
+      return;
+    }
+
+    core.info(`\n✅ Deployment completed successfully`);
     core.info(`🆔 Deployment ID: ${deploymentResult.deploymentId}`);
     core.info(`⏱️ Total time: ${totalTime}s`);
     core.info(`📊 Circuits processed: ${deploymentResult.circuitCount}`);
 
     if (deploymentResult.previewUrl) {
-      core.info(`🔗 Preview URL: ${deploymentResult.previewUrl}`);
+      core.info(`\n🔗 Preview URL: ${deploymentResult.previewUrl}`);
     }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    core.setFailed(`❌ tscircuit Deploy failed: ${errorMessage}`);
+    core.setFailed(`☠️ Workflow failed: ${errorMessage}`);
     process.exit(1);
   }
 }
@@ -92,7 +91,7 @@ async function handlePullRequest(
   context: typeof github.context,
   octokit: ReturnType<typeof github.getOctokit>
 ): Promise<DeploymentResult> {
-  core.info(`🔄 Processing pull request #${context.payload.pull_request?.number}`);
+  core.info(`\n🔄 Processing pull request #${context.payload.pull_request?.number}`);
 
   const pullRequest = context.payload.pull_request;
   if (!pullRequest) {
@@ -102,7 +101,7 @@ async function handlePullRequest(
   const circuitFiles = await findCircuitFiles(inputs.workingDirectory);
   
   if (circuitFiles.length === 0) {
-    core.warning('⚠️ No circuit files found - skipping deployment');
+    core.warning('⚠️ No circuit files found');
     return {
       deploymentId: 'no-circuits',
       buildTime: 0,
@@ -111,12 +110,11 @@ async function handlePullRequest(
     };
   }
 
-  core.info(`📋 Found ${circuitFiles.length} circuit file(s)`);
+  core.info(`📋 Found ${circuitFiles.length} circuit file(s)\n`);
 
-  const deploymentId = generateDeploymentId();
-  const previewUrl = `https://${deploymentId}.preview.tscircuit.com`;
+  const deploymentId = `deployment-${randomId()}`;
+  const previewUrl = `${DEPLOY_URL}/${deploymentId}`;
 
-  // Create GitHub deployment (optional - may fail due to permissions)
   let deploymentStatusId: number | undefined;
   
   try {
@@ -136,7 +134,7 @@ async function handlePullRequest(
     if (deploymentStatusId) {
       core.info(`✅ Created GitHub deployment: ${deploymentStatusId}`);
     } else {
-      core.warning('⚠️ Failed to create GitHub deployment - continuing without deployment tracking');
+      core.warning('\n⚠️ Failed to create GitHub deployment - continuing without deployment tracking');
     }
   } catch (error) {
     core.warning(`⚠️ GitHub deployment creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -151,12 +149,12 @@ async function handlePullRequest(
     const checkRun = await octokit.rest.checks.create({
       owner: context.repo.owner,
       repo: context.repo.repo,
-      name: 'tscircuit Deploy',
+      name: 'tscircuit deploy',
       head_sha: pullRequest.head.sha,
       status: 'in_progress',
       details_url: previewUrl,
       output: {
-        title: 'Building Preview Deploy',
+        title: '🔃 Building Preview Deploy',
         summary: `Found ${circuitFiles.length} circuit file${circuitFiles.length === 1 ? '' : 's'}. Starting build...`,
       },
     });
@@ -302,7 +300,7 @@ async function handlePush(
     };
   }
 
-  const deploymentId = generateDeploymentId();
+  const deploymentId = `deployment-${randomId()}`;
   const environment = (branch === 'main' || branch === 'master') ? 'production' : 'staging';
   
   // Create GitHub deployment for push events (optional - may fail due to permissions)
@@ -471,85 +469,7 @@ async function runTscircuitBuild(
   }
 }
 
-async function getLastTag(
-  octokit: ReturnType<typeof github.getOctokit>,
-  context: typeof github.context
-): Promise<string> {
-  try {
-    const { data: tags } = await octokit.rest.repos.listTags({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      per_page: 1,
-    });
 
-    if (tags.length > 0) {
-      return tags[0].name.replace(/^v/, '');
-    }
-  } catch (error) {
-    core.warning(`Failed to get last tag: ${error}`);
-  }
-
-  return '0.0.0';
-}
-
-function generateNextVersion(currentVersion: string, commitMessage: string): string {
-  const [major, minor, patch] = currentVersion.split('.').map(Number);
-  
-  const conventionalCommitRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?(!)?:/;
-  const match = commitMessage.match(conventionalCommitRegex);
-  
-  if (!match) {
-    return `${major}.${minor}.${patch + 1}`;
-  }
-  
-  const [, type, , breaking] = match;
-  
-  if (breaking === '!' || commitMessage.toLowerCase().includes('breaking change')) {
-    return `${major + 1}.0.0`;
-  }
-  
-  if (type === 'feat') {
-    return `${major}.${minor + 1}.0`;
-  }
-  
-  return `${major}.${minor}.${patch + 1}`;
-}
-
-function generateDeploymentId(): string {
-  return `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-}
-
-function getPngPreviewSection(
-  pngPreviews: Array<{
-    name: string;
-    type: 'pcb' | 'schematic' | '3d';
-    pngFilePath: string;
-    svgFilePath: string;
-  }>,
-  deploymentId: string
-): string {
-  const previewsToShow = pngPreviews.slice(0, 6);
-  
-  const previewItems = previewsToShow.map(preview => {
-    // For GitHub comments, we can't embed images directly, so we'll reference them
-    // In a real deployment, these would be uploaded to a CDN or artifact storage
-    const fileName = require('node:path').basename(preview.pngFilePath);
-    const typeEmoji = preview.type === 'pcb' ? '🟢' : preview.type === 'schematic' ? '📋' : '🎯';
-    
-    return `#### ${typeEmoji} ${preview.name} (${preview.type.toUpperCase()})
-![${preview.name} ${preview.type}](https://deploy.tscircuit.com/artifacts/${deploymentId}/${fileName})
-
-*📄 [Download PNG](https://deploy.tscircuit.com/artifacts/${deploymentId}/${fileName}) • [View SVG](https://deploy.tscircuit.com/artifacts/${deploymentId}/${require('node:path').basename(preview.svgFilePath)})*`;
-  }).join('\n\n');
-  
-  const extraCount = pngPreviews.length > 6 ? `\n\n*...and ${pngPreviews.length - 6} more previews available in the full deployment.*` : '';
-  
-  return `
-### 📸 PNG Preview Snapshots
-
-${previewItems}${extraCount}
-`;
-}
 
 function createImagePreviewsFromPng(
   pngPreviews: Array<{
