@@ -1,13 +1,11 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { z } from "zod";
-import snapshotProject, {
-  findCircuitFiles,
-  SnapshotResult,
-} from "./snapshot-project";
-import { App } from "octokit";
-import { DEPLOY_URL } from "./constants";
+import snapshotProject, { findCircuitFiles } from "./snapshot-project";
+import { DEPLOY_URL, DEPLOY_SERVER_URL } from "./constants";
 import { ulid } from "ulid";
+import ky from "ky";
+import { SnapshotResult } from "@tscircuit-deploy/shared/types";
 
 const InputSchema = z.object({
   githubToken: z.string(),
@@ -17,12 +15,13 @@ interface DeploymentResult {
   deploymentId: string;
   previewUrl?: string;
   packageVersion?: string;
-  buildTime: number;
+  buildSnapshot: SnapshotResult | null;
   circuitCount: number;
-  status: "skipped" | "ready" | "error";
+  status: "skipped" | "ready" | "error" | "pending";
 }
 
-const botToken = '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'
+const botToken =
+  "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";
 
 async function run(): Promise<void> {
   try {
@@ -35,7 +34,6 @@ async function run(): Promise<void> {
     const octokit = github.getOctokit(inputs.githubToken);
     const botOctokit = github.getOctokit(botToken);
 
-
     core.info(`\n🔌 Starting tscircuit Deploy`);
     core.info(`\tRepository: ${context.repo.owner}/${context.repo.repo}`);
     core.info(`\tEvent: ${context.eventName}`);
@@ -47,7 +45,12 @@ async function run(): Promise<void> {
 
     switch (context.eventName) {
       case "pull_request":
-        deploymentResult = await handlePullRequest(inputs, context, octokit, botOctokit);
+        deploymentResult = await handlePullRequest(
+          inputs,
+          context,
+          octokit,
+          botOctokit,
+        );
         break;
 
       case "push":
@@ -59,6 +62,25 @@ async function run(): Promise<void> {
     }
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
+
+    const response = await ky.post(DEPLOY_SERVER_URL + "/deployments/create", {
+      json: {
+        id: deploymentResult.deploymentId,
+        meta: JSON.stringify(context.payload),
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        commitSha: context.sha,
+        buildLogs: "",
+        errorMessage: "",
+        metaType: context.eventName,
+        buildTime: totalTime,
+        snapshotResult: deploymentResult.buildSnapshot,
+      },
+    });
+
+    if (!response.ok) {
+      core.warning(`Failed to create deployment on server: ${response.json()}`);
+    }
 
     core.setOutput("deployment-id", deploymentResult.deploymentId);
     core.setOutput("build-time", totalTime.toString());
@@ -114,7 +136,7 @@ async function handlePullRequest(
     core.warning("⚠️ No circuit files found");
     return {
       deploymentId: "no-circuits",
-      buildTime: 0,
+      buildSnapshot: null,
       circuitCount: 0,
       status: "skipped",
     };
@@ -255,7 +277,7 @@ async function handlePullRequest(
     return {
       deploymentId,
       previewUrl,
-      buildTime: buildResult.buildTime,
+      buildSnapshot: buildResult.snapshotResult,
       circuitCount: circuitFiles.length,
       status: "ready",
     };
@@ -315,7 +337,7 @@ async function handlePush(
     core.warning("⚠️ No circuit files found - skipping deployment");
     return {
       deploymentId: "no-circuits",
-      buildTime: 0,
+      buildSnapshot: null,
       circuitCount: 0,
       status: "skipped",
     };
@@ -361,10 +383,9 @@ async function handlePush(
 
   let packageVersion: string | undefined;
   let deploymentUrl: string | undefined;
-  let buildResult: { buildTime: number; snapshotResult: SnapshotResult };
 
   try {
-    buildResult = await runTscircuitBuild(inputs, circuitFiles);
+    const buildResult = await runTscircuitBuild(inputs, circuitFiles);
 
     if (branch === "main" || branch === "master") {
       core.info("🚀 Main branch detected - publishing package - TODO PAUSED");
@@ -412,7 +433,7 @@ async function handlePush(
     return {
       deploymentId,
       packageVersion,
-      buildTime: buildResult.buildTime,
+      buildSnapshot: buildResult.snapshotResult,
       circuitCount: circuitFiles.length,
       status: "ready",
     };

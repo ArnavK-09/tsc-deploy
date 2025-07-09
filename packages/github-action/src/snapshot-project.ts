@@ -9,23 +9,9 @@ import {
 import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d";
 import { CircuitRunner } from "tscircuit";
 import { relative } from "node:path";
-import { saveSvgAsPng, ImageFormat } from "./svg-to-png";
+import { SnapshotResult } from "@tscircuit-deploy/shared/types";
 
 const ALLOWED_FILE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
-
-export interface SnapshotResult {
-  circuitFiles: Array<{
-    path: string;
-    name: string;
-    svg: {
-      pcb: string | null;
-      schematic: string | null;
-    };
-  }>;
-  buildTime: number;
-  success: boolean;
-  error?: string;
-}
 
 export async function findCircuitFiles(
   workingDirectory: string,
