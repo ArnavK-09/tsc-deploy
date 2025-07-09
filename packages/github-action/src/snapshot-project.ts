@@ -11,7 +11,7 @@ import { CircuitRunner } from "tscircuit"
 import { relative } from "node:path"
 
 const ALLOWED_FILE_EXTENSIONS = [
-  ".tsx", ".ts", ".jsx", ".js", ".json", ".txt", ".md",
+  ".tsx", ".ts", ".jsx", ".js",
 ]
 
 type GenerateCircuitJsonOptions = {
