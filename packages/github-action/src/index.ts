@@ -194,15 +194,19 @@ async function handlePullRequest(
 
     // Update deployment status to success
     if (deploymentStatusId) {
-      await octokit.rest.repos.createDeploymentStatus({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        deployment_id: deploymentStatusId,
-        state: 'success',
-        description: `Preview deployment ready with ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'}`,
-        environment_url: previewUrl,
-        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-      });
+      try {
+        await updateDeploymentStatus(
+          octokit,
+          context,
+          deploymentStatusId,
+          'success',
+          `Preview deployment ready with ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'}`,
+          previewUrl
+        );
+        core.info(`✅ Updated deployment status to success`);
+      } catch (error) {
+        core.warning(`⚠️ Failed to update deployment status: ${error}`);
+      }
     }
 
     const comment = createPRComment({
@@ -251,13 +255,18 @@ async function handlePullRequest(
 
     // Update deployment status to failure
     if (deploymentStatusId) {
-      await updateDeploymentStatus(
-        octokit,
-        context,
-        deploymentStatusId,
-        'failure',
-        `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      try {
+        await updateDeploymentStatus(
+          octokit,
+          context,
+          deploymentStatusId,
+          'failure',
+          `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        core.info(`✅ Updated deployment status to failure`);
+      } catch (deployError) {
+        core.warning(`⚠️ Failed to update deployment status: ${deployError}`);
+      }
     }
 
     throw error;
@@ -352,15 +361,19 @@ async function handlePush(
 
     // Update deployment status to success
     if (deploymentStatusId) {
-      await octokit.rest.repos.createDeploymentStatus({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        deployment_id: deploymentStatusId,
-        state: 'success',
-        description: `${environment} deployment completed with ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'}`,
-        environment_url: deploymentUrl,
-        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-      });
+      try {
+        await updateDeploymentStatus(
+          octokit,
+          context,
+          deploymentStatusId,
+          'success',
+          `${environment} deployment completed with ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'}`,
+          deploymentUrl
+        );
+        core.info(`✅ Updated deployment status to success`);
+      } catch (error) {
+        core.warning(`⚠️ Failed to update deployment status: ${error}`);
+      }
     }
 
     return {
@@ -374,14 +387,18 @@ async function handlePush(
   } catch (error) {
     // Update deployment status to failure
     if (deploymentStatusId) {
-      await octokit.rest.repos.createDeploymentStatus({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        deployment_id: deploymentStatusId,
-        state: 'failure',
-        description: `${environment} deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-      });
+      try {
+        await updateDeploymentStatus(
+          octokit,
+          context,
+          deploymentStatusId,
+          'failure',
+          `${environment} deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        core.info(`✅ Updated deployment status to failure`);
+      } catch (deployError) {
+        core.warning(`⚠️ Failed to update deployment status: ${deployError}`);
+      }
     }
 
     throw error;
