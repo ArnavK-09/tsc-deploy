@@ -2,7 +2,6 @@
   "name": "@tscircuit-deploy/github-action",
   "version": "1.0.0",
   "description": "GitHub Action for tscircuit Deploy",
-  "type": "module",
   "private": true,
   "main": "dist/index.js",
   "scripts": {

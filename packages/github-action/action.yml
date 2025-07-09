@@ -48,5 +48,5 @@ outputs:
     description: 'Number of circuit files processed'
 
 runs:
-  using: 'bun'
-  main: 'src/index.ts' 
+  using: 'node20'
+  main: 'dist/index.js' 
