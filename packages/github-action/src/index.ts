@@ -517,17 +517,14 @@ function createImagePreviewTable(
   });
 
   const tableRows = Array.from(circuitGroups.entries())
-    .map(([circuitName, meta]) => {
-      let pcbCell = "—";
-      let schematicCell = "—";
-
+    .map(([circuitName]) => {
       const pcbSvg = circuitGroups.get(circuitName)?.[0]?.svg.pcb;
       const schematicSvg = circuitGroups.get(circuitName)?.[0]?.svg.schematic;
 
-      pcbCell = pcbSvg ?? "*Error loading PCB*";
-      schematicCell = schematicSvg ?? "*Error loading Schematic*";
+      const pcbCell = `<img src="${pcbSvg}" alt="PCB" width="120" height="80" />`;
+      const schematicCell = `<img src="${schematicSvg}" alt="Schematic" width="120" height="80" />`;
 
-      return `| **${circuitGroups.get(circuitName)?.[0]?.path}** | ${pcbCell} | ${schematicCell} |`;
+      return `| **${circuitName}** | ${pcbCell} | ${schematicCell} |`;
     })
     .join("\n");
 
