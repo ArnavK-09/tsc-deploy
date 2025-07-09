@@ -1,17 +1,14 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const DeploymentStatusSchema = z.enum([
-  'pending',
-  'building',
-  'ready',
-  'error',
-  'cancelled'
+  "pending",
+  "building",
+  "ready",
+  "error",
+  "cancelled",
 ]);
 
-export const DeploymentTypeSchema = z.enum([
-  'preview',
-  'production'
-]);
+export const DeploymentTypeSchema = z.enum(["preview", "production"]);
 
 export const RepositorySchema = z.object({
   id: z.number(),
@@ -22,7 +19,7 @@ export const RepositorySchema = z.object({
   defaultBranch: z.string(),
   isActive: z.boolean(),
   createdAt: z.date(),
-  updatedAt: z.date()
+  updatedAt: z.date(),
 });
 
 export const DeploymentSchema = z.object({
@@ -41,13 +38,13 @@ export const DeploymentSchema = z.object({
   buildStartedAt: z.date().optional(),
   buildCompletedAt: z.date().optional(),
   createdAt: z.date(),
-  updatedAt: z.date()
+  updatedAt: z.date(),
 });
 
 export const CircuitFileSchema = z.object({
   path: z.string(),
   content: z.string(),
-  sha: z.string()
+  sha: z.string(),
 });
 
 export const SnapshotSchema = z.object({
@@ -55,18 +52,18 @@ export const SnapshotSchema = z.object({
   deploymentId: z.string(),
   circuitPath: z.string(),
   snapshotData: z.record(z.any()),
-  createdAt: z.date()
+  createdAt: z.date(),
 });
 
 export const BuildArtifactSchema = z.object({
   id: z.string(),
   deploymentId: z.string(),
-  type: z.enum(['pcb', 'schematic', 'bom', 'gerber']),
+  type: z.enum(["pcb", "schematic", "bom", "gerber"]),
   fileName: z.string(),
   filePath: z.string(),
   fileSize: z.number(),
   contentType: z.string(),
-  createdAt: z.date()
+  createdAt: z.date(),
 });
 
 export const WebhookEventSchema = z.object({
@@ -75,7 +72,7 @@ export const WebhookEventSchema = z.object({
   eventType: z.string(),
   payload: z.record(z.any()),
   processed: z.boolean(),
-  createdAt: z.date()
+  createdAt: z.date(),
 });
 
 export type DeploymentStatus = z.infer<typeof DeploymentStatusSchema>;
@@ -111,4 +108,4 @@ export interface DeploymentResult {
   errorMessage?: string;
   buildTime: number;
   artifacts: BuildArtifact[];
-} 
+}

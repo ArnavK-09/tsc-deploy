@@ -25,12 +25,12 @@ Create `.github/workflows/tscircuit-deploy.yml`:
 name: tscircuit Deploy
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
   pull_request:
 
 jobs:
   tscircuit:
-    permissions: 
+    permissions:
       contents: read
       pull-requests: write
       statuses: write
@@ -59,13 +59,13 @@ graph TB
     D --> E[tscircuit CLI]
     E --> F[Circuit Snapshots]
     F --> G[Preview Server]
-    
+
     C --> H[Database]
     G --> H
-    
+
     I[GitHub Actions] --> J[CLI Action]
     J --> E
-    
+
     K[Pull Request] --> L[Status Checks]
     K --> M[PR Comments]
     L --> G
@@ -145,6 +145,7 @@ bun run dev --filter=server   # Preview deployment server
 ## 📊 Project Roadmap
 
 ### Phase 1: Core Infrastructure ✅
+
 - [x] Foundational architecture with TypeScript types
 - [x] Database schema with Drizzle ORM
 - [x] GitHub App with webhook handling
@@ -152,6 +153,7 @@ bun run dev --filter=server   # Preview deployment server
 - [x] Preview deployment server with HTML rendering
 
 ### Phase 2: CI/CD Pipeline ✅
+
 - [x] GitHub Action for workflow automation
 - [x] Circuit file detection and validation
 - [x] Semantic version bumping logic
@@ -159,6 +161,7 @@ bun run dev --filter=server   # Preview deployment server
 - [x] PR status checks and comments
 
 ### Phase 3: Enhanced Features (In Progress)
+
 - [ ] Interactive circuit viewer with WebGL
 - [ ] Snapshot diff visualization with side-by-side comparison
 - [ ] Build caching and optimization
@@ -166,6 +169,7 @@ bun run dev --filter=server   # Preview deployment server
 - [ ] Custom domain support for preview deployments
 
 ### Phase 4: Advanced Capabilities (Planned)
+
 - [ ] Real-time build streaming and logs
 - [ ] Slack/Teams notifications
 - [ ] Branch-level environments
@@ -174,6 +178,7 @@ bun run dev --filter=server   # Preview deployment server
 - [ ] Performance monitoring and analytics
 
 ### Phase 5: Enterprise Features (Future)
+
 - [ ] SSO integration with GitHub Organizations
 - [ ] Advanced access controls and permissions
 - [ ] Audit compliance and security scanning
@@ -182,13 +187,13 @@ bun run dev --filter=server   # Preview deployment server
 
 ## 🎯 Success Metrics
 
-| Goal | Target | Status |
-|------|--------|--------|
+| Goal                                 | Target                        | Status            |
+| ------------------------------------ | ----------------------------- | ----------------- |
 | One-click repo setup with auto CI/CD | ≥90% success rate on first PR | 🔄 In Development |
-| Preview deploy speed | ≤4 min median build time | 🔄 In Development |
-| Production uptime | ≥99.5% availability | 🔄 In Development |
-| Automatic version selection | ≥95% correct semantic bumps | 🔄 In Development |
-| Historical auditability | 2+ year retention | 🔄 In Development |
+| Preview deploy speed                 | ≤4 min median build time      | 🔄 In Development |
+| Production uptime                    | ≥99.5% availability           | 🔄 In Development |
+| Automatic version selection          | ≥95% correct semantic bumps   | 🔄 In Development |
+| Historical auditability              | 2+ year retention             | 🔄 In Development |
 
 ## 🤝 Contributing
 
@@ -230,4 +235,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by the tscircuit community** 
+**Built with ❤️ by the tscircuit community**

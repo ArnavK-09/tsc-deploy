@@ -1,22 +1,38 @@
-import { InstallationEvent, InstallationRepositoriesEvent, PullRequestEvent, PushEvent   } from '@octokit/webhooks-types';
-import { GitHubAppService } from './github-app.js';
-import { BuildService } from './build-service.js';
-import { RepositoryService } from './repository-service.js';
-import { generateDeploymentId, createPRComment, extractCircuitFiles } from '@tscircuit-deploy/shared/utils';
-import { db, repositories, deployments, webhookEvents } from '@tscircuit-deploy/shared/db';
-import { eq } from 'drizzle-orm';
+import {
+  InstallationEvent,
+  InstallationRepositoriesEvent,
+  PullRequestEvent,
+  PushEvent,
+} from "@octokit/webhooks-types";
+import { GitHubAppService } from "./github-app.js";
+import { BuildService } from "./build-service.js";
+import { RepositoryService } from "./repository-service.js";
+import {
+  generateDeploymentId,
+  createPRComment,
+  extractCircuitFiles,
+} from "@tscircuit-deploy/shared/utils";
+import {
+  db,
+  repositories,
+  deployments,
+  webhookEvents,
+} from "@tscircuit-deploy/shared/db";
+import { eq } from "drizzle-orm";
 
 export class WebhookHandlers {
   constructor(
     private githubApp: GitHubAppService,
     private buildService: BuildService,
-    private repositoryService: RepositoryService
+    private repositoryService: RepositoryService,
   ) {}
 
-  async handleInstallation(payload: InstallationEvent & { action: 'created' | 'deleted' }) {
+  async handleInstallation(
+    payload: InstallationEvent & { action: "created" | "deleted" },
+  ) {
     console.log(`Installation ${payload.action}:`, payload.installation.id);
 
-    if (payload.action === 'created') {
+    if (payload.action === "created") {
       for (const repo of payload?.repositories || []) {
         await this.repositoryService.createRepository({
           githubId: repo.id,
@@ -24,11 +40,11 @@ export class WebhookHandlers {
           fullName: repo.full_name,
           owner: payload.installation.account.login,
           installationId: payload.installation.id,
-          defaultBranch: 'main',
+          defaultBranch: "main",
           isActive: true,
         });
       }
-    } else if (payload.action === 'deleted') {
+    } else if (payload.action === "deleted") {
       await db
         .update(repositories)
         .set({ isActive: false })
@@ -36,10 +52,16 @@ export class WebhookHandlers {
     }
   }
 
-  async handleInstallationRepositories(payload: InstallationRepositoriesEvent & { action: 'added' | 'removed' }) {
-    console.log(`Installation repositories ${payload.action}:`, payload.repositories_added?.length || payload.repositories_removed?.length);
+  async handleInstallationRepositories(
+    payload: InstallationRepositoriesEvent & { action: "added" | "removed" },
+  ) {
+    console.log(
+      `Installation repositories ${payload.action}:`,
+      payload.repositories_added?.length ||
+        payload.repositories_removed?.length,
+    );
 
-    if (payload.action === 'added' && payload.repositories_added) {
+    if (payload.action === "added" && payload.repositories_added) {
       for (const repo of payload.repositories_added) {
         await this.repositoryService.createRepository({
           githubId: repo.id,
@@ -47,11 +69,11 @@ export class WebhookHandlers {
           fullName: repo.full_name,
           owner: payload.installation.account.login,
           installationId: payload.installation.id,
-          defaultBranch: 'main',
+          defaultBranch: "main",
           isActive: true,
         });
       }
-    } else if (payload.action === 'removed' && payload.repositories_removed) {
+    } else if (payload.action === "removed" && payload.repositories_removed) {
       for (const repo of payload.repositories_removed) {
         await db
           .update(repositories)
@@ -63,16 +85,22 @@ export class WebhookHandlers {
 
   async handlePullRequest(payload: PullRequestEvent) {
     const { action, pull_request, repository, installation } = payload;
-    
+
     if (!installation) {
-      console.log('No installation found for PR webhook');
+      console.log("No installation found for PR webhook");
       return;
     }
 
     console.log(`PR ${action}: ${repository.full_name}#${pull_request.number}`);
 
-    if (action === 'opened' || action === 'synchronize' || action === 'reopened') {
-      const repo = await this.repositoryService.getRepositoryByGithubId(repository.id);
+    if (
+      action === "opened" ||
+      action === "synchronize" ||
+      action === "reopened"
+    ) {
+      const repo = await this.repositoryService.getRepositoryByGithubId(
+        repository.id,
+      );
       if (!repo) {
         console.log(`Repository not found: ${repository.id}`);
         return;
@@ -82,7 +110,7 @@ export class WebhookHandlers {
         installation.id,
         repository.owner.login,
         repository.name,
-        pull_request.head.sha
+        pull_request.head.sha,
       );
 
       if (circuitFiles.length === 0) {
@@ -91,14 +119,14 @@ export class WebhookHandlers {
       }
 
       const deploymentId = generateDeploymentId();
-      
+
       await db.insert(deployments).values({
         id: deploymentId,
         repositoryId: repo.id,
         commitSha: pull_request.head.sha,
         branch: pull_request.head.ref,
-        status: 'pending',
-        type: 'preview',
+        status: "pending",
+        type: "preview",
         pullRequestNumber: pull_request.number,
         circuitCount: circuitFiles.length,
       });
@@ -108,23 +136,23 @@ export class WebhookHandlers {
         repository.owner.login,
         repository.name,
         {
-          name: 'tscircuit Deploy',
+          name: "tscircuit Deploy",
           head_sha: pull_request.head.sha,
-          status: 'in_progress',
+          status: "in_progress",
           details_url: `https://deploy.tscircuit.com/deployment/${deploymentId}`,
           output: {
-            title: 'Building Preview Deploy',
-            summary: `Found ${circuitFiles.length} circuit file${circuitFiles.length === 1 ? '' : 's'}. Starting build...`,
+            title: "Building Preview Deploy",
+            summary: `Found ${circuitFiles.length} circuit file${circuitFiles.length === 1 ? "" : "s"}. Starting build...`,
           },
-        }
+        },
       );
 
       const comment = createPRComment({
         deploymentId,
         previewUrl: `https://${deploymentId}.preview.tscircuit.com`,
-        buildTime: '⏳ Building...',
+        buildTime: "⏳ Building...",
         circuitCount: circuitFiles.length,
-        status: 'building',
+        status: "building",
         commitSha: pull_request.head.sha,
       });
 
@@ -133,7 +161,7 @@ export class WebhookHandlers {
         repository.owner.login,
         repository.name,
         pull_request.number,
-        comment
+        comment,
       );
 
       await this.buildService.startBuild({
@@ -149,16 +177,18 @@ export class WebhookHandlers {
 
   async handlePush(payload: PushEvent) {
     const { ref, repository, installation, commits } = payload;
-    
+
     if (!installation) {
-      console.log('No installation found for push webhook');
+      console.log("No installation found for push webhook");
       return;
     }
 
-    const branch = ref.replace('refs/heads/', '');
+    const branch = ref.replace("refs/heads/", "");
     console.log(`Push to ${repository.full_name}:${branch}`);
 
-    const repo = await this.repositoryService.getRepositoryByGithubId(repository.id);
+    const repo = await this.repositoryService.getRepositoryByGithubId(
+      repository.id,
+    );
     if (!repo) {
       console.log(`Repository not found: ${repository.id}`);
       return;
@@ -172,7 +202,7 @@ export class WebhookHandlers {
         installation.id,
         repository.owner.login,
         repository.name,
-        latestCommit.id
+        latestCommit.id,
       );
 
       if (circuitFiles.length === 0) {
@@ -181,14 +211,14 @@ export class WebhookHandlers {
       }
 
       const deploymentId = generateDeploymentId();
-      
+
       await db.insert(deployments).values({
         id: deploymentId,
         repositoryId: repo.id,
         commitSha: latestCommit.id,
         branch,
-        status: 'pending',
-        type: 'production',
+        status: "pending",
+        type: "production",
         circuitCount: circuitFiles.length,
       });
 
@@ -202,7 +232,11 @@ export class WebhookHandlers {
     }
   }
 
-  async logWebhookEvent(eventType: string, payload: any, repositoryId?: number) {
+  async logWebhookEvent(
+    eventType: string,
+    payload: any,
+    repositoryId?: number,
+  ) {
     try {
       await db.insert(webhookEvents).values({
         id: generateDeploymentId(),
@@ -212,7 +246,7 @@ export class WebhookHandlers {
         processed: false,
       });
     } catch (error) {
-      console.error('Failed to log webhook event:', error);
+      console.error("Failed to log webhook event:", error);
     }
   }
-} 
+}

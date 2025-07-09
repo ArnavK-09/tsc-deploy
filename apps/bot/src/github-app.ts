@@ -1,7 +1,7 @@
-import { App } from '@octokit/app';
-import { Webhooks } from '@octokit/webhooks';
-import { Octokit } from '@octokit/rest';
-import type { RestEndpointMethodTypes } from '@octokit/rest';
+import { App } from "@octokit/app";
+import { Webhooks } from "@octokit/webhooks";
+import { Octokit } from "@octokit/rest";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 export interface GitHubAppConfig {
   appId: string;
@@ -45,7 +45,7 @@ export class GitHubAppService {
     try {
       return this.webhooks.verify(payload, signature);
     } catch (error) {
-      console.error('Webhook verification failed:', error);
+      console.error("Webhook verification failed:", error);
       return false;
     }
   }
@@ -57,18 +57,24 @@ export class GitHubAppService {
     options: {
       name: string;
       head_sha: string;
-      status?: 'queued' | 'in_progress' | 'completed';
-      conclusion?: 'success' | 'failure' | 'neutral' | 'cancelled' | 'timed_out' | 'action_required';
+      status?: "queued" | "in_progress" | "completed";
+      conclusion?:
+        | "success"
+        | "failure"
+        | "neutral"
+        | "cancelled"
+        | "timed_out"
+        | "action_required";
       details_url?: string;
       output?: {
         title: string;
         summary: string;
         text?: string;
       };
-    }
+    },
   ) {
     const octokit = await this.getInstallationOctokit(installationId);
-    
+
     return octokit.rest.checks.create({
       owner,
       repo,
@@ -82,18 +88,24 @@ export class GitHubAppService {
     repo: string,
     checkRunId: number,
     options: {
-      status?: 'queued' | 'in_progress' | 'completed';
-      conclusion?: 'success' | 'failure' | 'neutral' | 'cancelled' | 'timed_out' | 'action_required';
+      status?: "queued" | "in_progress" | "completed";
+      conclusion?:
+        | "success"
+        | "failure"
+        | "neutral"
+        | "cancelled"
+        | "timed_out"
+        | "action_required";
       details_url?: string;
       output?: {
         title: string;
         summary: string;
         text?: string;
       };
-    }
+    },
   ) {
     const octokit = await this.getInstallationOctokit(installationId);
-    
+
     return octokit.rest.checks.update({
       owner,
       repo,
@@ -107,10 +119,10 @@ export class GitHubAppService {
     owner: string,
     repo: string,
     pullNumber: number,
-    body: string
+    body: string,
   ) {
     const octokit = await this.getInstallationOctokit(installationId);
-    
+
     return octokit.rest.issues.createComment({
       owner,
       repo,
@@ -124,10 +136,10 @@ export class GitHubAppService {
     owner: string,
     repo: string,
     commentId: number,
-    body: string
+    body: string,
   ) {
     const octokit = await this.getInstallationOctokit(installationId);
-    
+
     return octokit.rest.issues.updateComment({
       owner,
       repo,
@@ -141,10 +153,10 @@ export class GitHubAppService {
     owner: string,
     repo: string,
     ref: string,
-    path = ''
+    path = "",
   ): Promise<Array<{ path: string; content: string; sha: string }>> {
     const octokit = await this.getInstallationOctokit(installationId);
-    
+
     try {
       const { data } = await octokit.rest.repos.getContent({
         owner,
@@ -155,41 +167,62 @@ export class GitHubAppService {
 
       if (Array.isArray(data)) {
         const files: Array<{ path: string; content: string; sha: string }> = [];
-        
+
         for (const item of data) {
-          if (item.type === 'file' && item.name?.endsWith('.circuit.tsx')) {
+          if (item.type === "file" && item.name?.endsWith(".circuit.tsx")) {
             const fileData = await octokit.rest.repos.getContent({
               owner,
               repo,
               path: item.path,
               ref,
             });
-            
-            if (!Array.isArray(fileData.data) && fileData.data.type === 'file' && 'content' in fileData.data) {
+
+            if (
+              !Array.isArray(fileData.data) &&
+              fileData.data.type === "file" &&
+              "content" in fileData.data
+            ) {
               files.push({
                 path: item.path,
-                content: Buffer.from(fileData.data.content, 'base64').toString('utf8'),
+                content: Buffer.from(fileData.data.content, "base64").toString(
+                  "utf8",
+                ),
                 sha: fileData.data.sha,
               });
             }
-          } else if (item.type === 'dir') {
-            const subFiles = await this.getRepositoryFiles(installationId, owner, repo, ref, item.path);
+          } else if (item.type === "dir") {
+            const subFiles = await this.getRepositoryFiles(
+              installationId,
+              owner,
+              repo,
+              ref,
+              item.path,
+            );
             files.push(...subFiles);
           }
         }
-        
+
         return files;
-      } else if (data.type === 'file' && data.path?.endsWith('.circuit.tsx') && data.content) {
-        return [{
-          path: data.path,
-          content: Buffer.from(data.content, 'base64').toString('utf8'),
-          sha: data.sha,
-        }];
+      } else if (
+        data.type === "file" &&
+        data.path?.endsWith(".circuit.tsx") &&
+        data.content
+      ) {
+        return [
+          {
+            path: data.path,
+            content: Buffer.from(data.content, "base64").toString("utf8"),
+            sha: data.sha,
+          },
+        ];
       }
-      
+
       return [];
     } catch (error) {
-      console.error(`Failed to get repository files for ${owner}/${repo}:`, error);
+      console.error(
+        `Failed to get repository files for ${owner}/${repo}:`,
+        error,
+      );
       return [];
     }
   }
@@ -199,17 +232,17 @@ export class GitHubAppService {
     owner: string,
     repo: string,
     deploymentId: number,
-    state: 'error' | 'failure' | 'inactive' | 'pending' | 'success',
+    state: "error" | "failure" | "inactive" | "pending" | "success",
     options?: {
       target_url?: string;
       log_url?: string;
       description?: string;
       environment_url?: string;
       auto_inactive?: boolean;
-    }
+    },
   ) {
     const octokit = await this.getInstallationOctokit(installationId);
-    
+
     return octokit.rest.repos.createDeploymentStatus({
       owner,
       repo,
@@ -218,4 +251,4 @@ export class GitHubAppService {
       ...options,
     });
   }
-} 
+}

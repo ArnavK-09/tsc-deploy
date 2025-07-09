@@ -24,4 +24,4 @@
     { "path": "./apps/server" },
     { "path": "./packages/shared" }
   ]
-} 
+}
