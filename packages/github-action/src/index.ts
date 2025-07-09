@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { exec } from '@actions/exec';
 import { z } from 'zod';
+import { snapshotProject } from './snapshot-project';
 
 const InputSchema = z.object({
   args: z.string().default('deploy'),
@@ -114,6 +115,37 @@ async function handlePullRequest(
   const deploymentId = generateDeploymentId();
   const previewUrl = `https://${deploymentId}.preview.tscircuit.com`;
 
+  // Create GitHub deployment
+  const deployment = await octokit.rest.repos.createDeployment({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    ref: pullRequest.head.sha,
+    environment: 'preview',
+    description: `Preview deployment for PR #${pullRequest.number}`,
+    auto_merge: false,
+    required_contexts: [],
+    payload: {
+      deploymentId,
+      pullRequestNumber: pullRequest.number,
+      circuitCount: circuitFiles.length,
+    },
+  });
+
+  let deploymentStatusId: number | undefined;
+
+  // Set deployment status to in_progress (only if deployment was created successfully)
+  if ('id' in deployment.data) {
+    await octokit.rest.repos.createDeploymentStatus({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      deployment_id: deployment.data.id,
+      state: 'in_progress',
+      description: 'Building preview deployment...',
+      log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+    });
+    deploymentStatusId = deployment.data.id;
+  }
+
   const checkRun = await octokit.rest.checks.create({
     owner: context.repo.owner,
     repo: context.repo.repo,
@@ -143,6 +175,19 @@ async function handlePullRequest(
         text: `## 🔗 Preview URL\n${previewUrl}\n\n## 📊 Build Details\n- Circuits: ${circuitFiles.length}\n- Build time: ${buildResult.buildTime}s\n- Status: Ready`,
       },
     });
+
+    // Update deployment status to success
+    if (deploymentStatusId) {
+      await octokit.rest.repos.createDeploymentStatus({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        deployment_id: deploymentStatusId,
+        state: 'success',
+        description: `Preview deployment ready with ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'}`,
+        environment_url: previewUrl,
+        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+      });
+    }
 
     const comment = createPRComment({
       deploymentId,
@@ -181,6 +226,18 @@ async function handlePullRequest(
       },
     });
 
+    // Update deployment status to failure
+    if (deploymentStatusId) {
+      await octokit.rest.repos.createDeploymentStatus({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        deployment_id: deploymentStatusId,
+        state: 'failure',
+        description: `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+      });
+    }
+
     throw error;
   }
 }
@@ -208,64 +265,115 @@ async function handlePush(
   }
 
   const deploymentId = generateDeploymentId();
-  const buildResult = await runTscircuitBuild(inputs, circuitFiles);
+  const environment = (branch === 'main' || branch === 'master') ? 'production' : 'staging';
+  
+  // Create GitHub deployment for push events
+  const deployment = await octokit.rest.repos.createDeployment({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    ref: context.sha,
+    environment,
+    description: `Deploy to ${environment} from ${branch}`,
+    auto_merge: false,
+    required_contexts: [],
+    payload: {
+      deploymentId,
+      branch,
+      circuitCount: circuitFiles.length,
+    },
+  });
 
-  let packageVersion: string | undefined;
-
-  if (branch === 'main' || branch === 'master') {
-    core.info('🚀 Main branch detected - publishing package - TODO PAUSED');
-    
-    // const lastTag = await getLastTag(octokit, context);
-    // packageVersion = generateNextVersion(lastTag, context.payload.head_commit?.message || '');
-    
-    // core.info(`📦 Publishing version ${packageVersion}`);
-
-    // await octokit.rest.git.createTag({
-    //   owner: context.repo.owner,
-    //   repo: context.repo.repo,
-    //   tag: `v${packageVersion}`,
-    //   message: `Release v${packageVersion}`,
-    //   object: context.sha,
-    //   type: 'commit',
-    // });
-
-    // await octokit.rest.git.createRef({
-    //   owner: context.repo.owner,
-    //   repo: context.repo.repo,
-    //   ref: `refs/tags/v${packageVersion}`,
-    //   sha: context.sha,
-    // });
+  let deploymentStatusId: number | undefined;
+  
+  if ('id' in deployment.data) {
+    await octokit.rest.repos.createDeploymentStatus({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      deployment_id: deployment.data.id,
+      state: 'in_progress',
+      description: `Building ${environment} deployment...`,
+      log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+    });
+    deploymentStatusId = deployment.data.id;
   }
 
-  return {
-    deploymentId,
-    packageVersion,
-    buildTime: buildResult.buildTime,
-    circuitCount: circuitFiles.length,
-    status: 'ready',
-  };
+  let packageVersion: string | undefined;
+  let deploymentUrl: string | undefined;
+  let buildResult: { buildTime: number };
+
+  try {
+    buildResult = await runTscircuitBuild(inputs, circuitFiles);
+
+    if (branch === 'main' || branch === 'master') {
+      core.info('🚀 Main branch detected - publishing package - TODO PAUSED');
+      deploymentUrl = `https://deploy.tscircuit.com/${deploymentId}`;
+      
+      // const lastTag = await getLastTag(octokit, context);
+      // packageVersion = generateNextVersion(lastTag, context.payload.head_commit?.message || '');
+      
+      // core.info(`📦 Publishing version ${packageVersion}`);
+
+      // await octokit.rest.git.createTag({
+      //   owner: context.repo.owner,
+      //   repo: context.repo.repo,
+      //   tag: `v${packageVersion}`,
+      //   message: `Release v${packageVersion}`,
+      //   object: context.sha,
+      //   type: 'commit',
+      // });
+
+      // await octokit.rest.git.createRef({
+      //   owner: context.repo.owner,
+      //   repo: context.repo.repo,
+      //   ref: `refs/tags/v${packageVersion}`,
+      //   sha: context.sha,
+      // });
+    }
+
+    // Update deployment status to success
+    if (deploymentStatusId) {
+      await octokit.rest.repos.createDeploymentStatus({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        deployment_id: deploymentStatusId,
+        state: 'success',
+        description: `${environment} deployment completed with ${circuitFiles.length} circuit${circuitFiles.length === 1 ? '' : 's'}`,
+        environment_url: deploymentUrl,
+        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+      });
+    }
+
+    return {
+      deploymentId,
+      packageVersion,
+      buildTime: buildResult.buildTime,
+      circuitCount: circuitFiles.length,
+      status: 'ready',
+    };
+
+  } catch (error) {
+    // Update deployment status to failure
+    if (deploymentStatusId) {
+      await octokit.rest.repos.createDeploymentStatus({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        deployment_id: deploymentStatusId,
+        state: 'failure',
+        description: `${environment} deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+      });
+    }
+
+    throw error;
+  }
+
+
 }
 
 async function findCircuitFiles(workingDirectory: string): Promise<string[]> {
-  const files: string[] = [];
-  
-  try {
-    let output = '';
-    await exec('find', ['.', '-name', '*.circuit.tsx', '-o', '-name', '*.circuit.ts'], {
-      cwd: workingDirectory,
-      listeners: {
-        stdout: (data: Buffer) => {
-          output += data.toString();
-        },
-      },
-    });
-    
-    files.push(...output.trim().split('\n').filter(f => f.length > 0));
-  } catch (error) {
-    core.warning(`Failed to find circuit files: ${error}`);
-  }
-
-  return files;
+  // Use the snapshot project's findCircuitFiles functionality
+  const snapshotResult = await snapshotProject(workingDirectory);
+  return snapshotResult.circuitFiles;
 }
 
 async function runTscircuitBuild(
@@ -274,38 +382,39 @@ async function runTscircuitBuild(
 ): Promise<{ buildTime: number }> {
   const startTime = Date.now();
   
-  core.info('📦 Installing tscircuit CLI...');
+  core.info('🔨 Running tscircuit build and snapshot generation...');
+  core.info(`📋 Processing ${circuitFiles.length} circuit file(s): ${circuitFiles.join(', ')}`);
   
-  // try {
-  //   await exec('bun', ['install', '-g', '@tscircuit/cli'], {
-  //     cwd: inputs.workingDirectory,
-  //   });
-  // } catch (error) {
-  //   throw new Error(`Failed to install tscircuit CLI: ${error}`);
-  // }
-
-  core.info('🔨 Running tscircuit build...');
-  console.log('tscircuit build...', inputs.workingDirectory, circuitFiles);
-  
-  // try {
-  //   const timeoutMs = inputs.timeout * 60 * 1000;
-  //   const timeoutPromise = new Promise<never>((_, reject) => {
-  //     setTimeout(() => reject(new Error(`Build timeout after ${inputs.timeout} minutes`)), timeoutMs);
-  //   });
-
-  //   await Promise.race([
-  //     exec('tscircuit', [inputs.args], {
-  //       cwd: inputs.workingDirectory,
-  //     }),
-  //     timeoutPromise
-  //   ]);
-  // } catch (error) {
-  //   throw new Error(`tscircuit build failed: ${error}`);
-  // }
-
-  const buildTime = Math.round((Date.now() - startTime) / 1000);
-  
-  return { buildTime };
+  try {
+    const snapshotResult = await snapshotProject(inputs.workingDirectory);
+    
+    if (!snapshotResult.success) {
+      throw new Error(`Snapshot generation failed: ${snapshotResult.error || 'Unknown error'}`);
+    }
+    
+    core.info(`✅ Snapshot generation completed:`);
+    core.info(`   • Circuit files found: ${snapshotResult.circuitFiles.length}`);
+    core.info(`   • Snapshots created: ${snapshotResult.snapshotFiles.length}`);
+    core.info(`   • Build time: ${snapshotResult.buildTime}s`);
+    
+    // Log snapshot files for GitHub Actions output
+    if (snapshotResult.snapshotFiles.length > 0) {
+      core.startGroup('📸 Generated Snapshots');
+      snapshotResult.snapshotFiles.forEach(file => {
+        core.info(`  ${file}`);
+      });
+      core.endGroup();
+    }
+    
+    const buildTime = Math.round((Date.now() - startTime) / 1000);
+    
+    return { buildTime };
+    
+  } catch (error) {
+    const buildTime = Math.round((Date.now() - startTime) / 1000);
+    core.error(`❌ Build failed after ${buildTime}s`);
+    throw new Error(`tscircuit build failed: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 async function getLastTag(
@@ -380,21 +489,89 @@ function createPRComment(data: {
 
 ${status === 'ready' ? `🔗 **Preview URL**: ${previewUrl}` : ''}
 📊 **Circuits Found**: ${circuitCount}
+📸 **Snapshots Generated**: ${circuitCount} files
 ⏱️ **Build Time**: ${buildTime}
 🔧 **Commit**: \`${commitSha.substring(0, 7)}\`
 
 ${status === 'ready' ? `
 ### What's Included
-- Interactive circuit previews
-- PCB and schematic views
-- Component bill of materials
-- Gerber files for manufacturing
+- 📸 Circuit snapshots and metadata
+- 🔧 Interactive circuit previews
+- 📋 PCB and schematic views
+- 📊 Component bill of materials
+- 🏭 Manufacturing-ready files
+
+### Snapshots Generated
+- Circuit metadata in JSON format
+- Component and connection data
+- Build artifacts and logs
 
 [View deployment details →](${previewUrl}/deployment/${deploymentId})
 ` : ''}
 
 ---
-*Powered by [tscircuit Deploy](https://tscircuit.com)*`;
+*Powered by [tscircuit Deploy](https://tscircuit.com) • [View Snapshots](${previewUrl}/snapshots)*`;
+}
+
+async function createGitHubDeployment(
+  octokit: ReturnType<typeof github.getOctokit>,
+  context: typeof github.context,
+  environment: string,
+  ref: string,
+  description: string,
+  payload: Record<string, unknown>
+): Promise<number | undefined> {
+  try {
+    const deployment = await octokit.rest.repos.createDeployment({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      ref,
+      environment,
+      description,
+      auto_merge: false,
+      required_contexts: [],
+      payload,
+    });
+
+    if ('id' in deployment.data) {
+      await octokit.rest.repos.createDeploymentStatus({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        deployment_id: deployment.data.id,
+        state: 'in_progress',
+        description: `Building ${environment} deployment...`,
+        log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+      });
+      return deployment.data.id;
+    }
+  } catch (error) {
+    core.warning(`Failed to create GitHub deployment: ${error}`);
+  }
+  
+  return undefined;
+}
+
+async function updateDeploymentStatus(
+  octokit: ReturnType<typeof github.getOctokit>,
+  context: typeof github.context,
+  deploymentId: number,
+  state: 'success' | 'failure',
+  description: string,
+  environmentUrl?: string
+): Promise<void> {
+  try {
+    await octokit.rest.repos.createDeploymentStatus({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      deployment_id: deploymentId,
+      state,
+      description,
+      environment_url: environmentUrl,
+      log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+    });
+  } catch (error) {
+    core.warning(`Failed to update deployment status: ${error}`);
+  }
 }
 
 run(); 

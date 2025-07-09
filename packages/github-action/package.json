@@ -18,6 +18,9 @@
     "@actions/tool-cache": "^2.0.1",
     "@octokit/rest": "^21.0.1",
     "@tscircuit/cli": "^0.1.158",
+    "@tscircuit-deploy/shared": "workspace:*",
+    "circuit-json-to-simple-3d": "^0.0.4",
+    "circuit-to-svg": "^0.0.166",
     "zod": "^3.23.8"
   },
   "devDependencies": {
