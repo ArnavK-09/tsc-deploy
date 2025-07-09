@@ -20,6 +20,7 @@
     "@tscircuit/eval": "^0.0.248",
     "circuit-json-to-simple-3d": "latest",
     "circuit-to-svg": "^0.0.86",
+    "tscircuit": "^0.0.522",
     "zod": "^3.25.76"
   },
   "devDependencies": {

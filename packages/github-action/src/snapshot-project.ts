@@ -7,7 +7,7 @@ import {
   convertCircuitJsonToSchematicSvg,
 } from "circuit-to-svg"
 import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d"
-import { CircuitRunner } from "@tscircuit/eval"
+import { CircuitRunner } from "tscircuit"
 import { relative } from "node:path"
 
 const ALLOWED_FILE_EXTENSIONS = [
