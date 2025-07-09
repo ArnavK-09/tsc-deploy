@@ -1,10 +1,9 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { z } from "zod";
-import {
-  snapshotProject,
-  getSvgPreviews,
-  getPngPreviews,
+import snapshotProject, {
+  findCircuitFiles,
+  SnapshotResult,
 } from "./snapshot-project";
 import fs from "node:fs";
 import { DEPLOY_URL } from "./constants";
@@ -224,14 +223,6 @@ async function handlePullRequest(
       }
     }
 
-    // Get SVG and PNG previews if snapshot result is available
-    const svgPreviews = buildResult.snapshotResult
-      ? await getSvgPreviews(buildResult.snapshotResult)
-      : undefined;
-    const pngPreviews = buildResult.snapshotResult
-      ? await getPngPreviews(buildResult.snapshotResult)
-      : undefined;
-
     const comment = createPRComment({
       deploymentId,
       previewUrl,
@@ -239,8 +230,7 @@ async function handlePullRequest(
       circuitCount: circuitFiles.length,
       status: "ready",
       commitSha: pullRequest.head.sha,
-      svgPreviews,
-      pngPreviews,
+      snapshotResult: buildResult.snapshotResult,
     });
 
     await octokit.rest.issues.createComment({
@@ -359,7 +349,7 @@ async function handlePush(
 
   let packageVersion: string | undefined;
   let deploymentUrl: string | undefined;
-  let buildResult: { buildTime: number; snapshotResult?: any };
+  let buildResult: { buildTime: number; snapshotResult: SnapshotResult };
 
   try {
     buildResult = await runTscircuitBuild(inputs, circuitFiles);
@@ -435,16 +425,10 @@ async function handlePush(
   }
 }
 
-async function findCircuitFiles(workingDirectory: string): Promise<string[]> {
-  // Use the snapshot project's findCircuitFiles functionality
-  const snapshotResult = await snapshotProject(workingDirectory);
-  return snapshotResult.circuitFiles;
-}
-
 async function runTscircuitBuild(
   inputs: z.infer<typeof InputSchema>,
   circuitFiles: string[],
-): Promise<{ buildTime: number; snapshotResult?: any }> {
+): Promise<{ buildTime: number; snapshotResult: SnapshotResult }> {
   const startTime = Date.now();
 
   core.info("🔨 Running tscircuit build and snapshot generation...");
@@ -465,27 +449,7 @@ async function runTscircuitBuild(
     core.info(
       `   • Circuit files found: ${snapshotResult.circuitFiles.length}`,
     );
-    core.info(`   • SVG snapshots created: ${snapshotResult.svgFiles.length}`);
-    core.info(`   • PNG snapshots created: ${snapshotResult.pngFiles.length}`);
     core.info(`   • Build time: ${snapshotResult.buildTime}s`);
-
-    // Log SVG files for GitHub Actions output
-    if (snapshotResult.svgFiles.length > 0) {
-      core.startGroup("📸 Generated SVG Snapshots");
-      snapshotResult.svgFiles.forEach((file) => {
-        core.info(`  ${file}`);
-      });
-      core.endGroup();
-    }
-
-    // Log PNG files for GitHub Actions output
-    if (snapshotResult.pngFiles.length > 0) {
-      core.startGroup("📸 Generated PNG Snapshots");
-      snapshotResult.pngFiles.forEach((file) => {
-        core.info(`  ${file}`);
-      });
-      core.endGroup();
-    }
 
     const buildTime = Math.round((Date.now() - startTime) / 1000);
 
@@ -507,22 +471,29 @@ function createDeploymentTable(data: {
   status: "ready" | "error" | "skipped";
   commitSha: string;
 }): string {
-  const { deploymentId, previewUrl, buildTime, circuitCount, status, commitSha } = data;
-  
+  const {
+    deploymentId,
+    previewUrl,
+    buildTime,
+    circuitCount,
+    status,
+    commitSha,
+  } = data;
+
   const statusDisplay = {
     ready: "✅ Ready",
-    error: "❌ Failed", 
-    skipped: "⏭️ Skipped"
+    error: "❌ Failed",
+    skipped: "⏭️ Skipped",
   }[status];
 
   const inspectUrl = `${previewUrl}/inspect`;
   const currentTime = new Date().toLocaleDateString("en-US", {
     month: "short",
-    day: "numeric", 
+    day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZoneName: "short"
+    timeZoneName: "short",
   });
 
   return `| Name | Status | Preview | Circuits | Updated |
@@ -531,58 +502,34 @@ function createDeploymentTable(data: {
 }
 
 function createImagePreviewTable(
-  pngPreviews: Array<{
-    name: string;
-    type: "pcb" | "schematic" | "3d";
-    pngFilePath: string;
-    svgFilePath: string;
-  }>,
+  circuitFiles: SnapshotResult["circuitFiles"],
 ): string {
-  if (!pngPreviews.length) return "";
+  if (!circuitFiles.length) return "";
 
   // Group previews by circuit name
-  const circuitGroups = new Map<string, typeof pngPreviews>();
-  
-  pngPreviews.forEach(preview => {
-    if (!circuitGroups.has(preview.name)) {
-      circuitGroups.set(preview.name, []);
+  const circuitGroups = new Map<string, typeof circuitFiles>();
+
+  circuitFiles.forEach((file) => {
+    if (!circuitGroups.has(file.name)) {
+      circuitGroups.set(file.name, []);
     }
-    circuitGroups.get(preview.name)!.push(preview);
+    circuitGroups.get(file.name)!.push(file);
   });
 
-  const tableRows = Array.from(circuitGroups.entries()).map(([circuitName, previews]) => {
-    const pcbPreview = previews.find(p => p.type === "pcb");
-    const schematicPreview = previews.find(p => p.type === "schematic");
-    
-    let pcbCell = "—";
-    let schematicCell = "—";
-    
-    if (pcbPreview) {
-      try {
-        const pngBuffer = fs.readFileSync(pcbPreview.pngFilePath);
-        const base64Png = pngBuffer.toString("base64");
-        const dataUrl = `data:image/png;base64,${base64Png}`;
-        pcbCell = `<img src="${"https://registry-api.tscircuit.com/packages/images/ArnavK-09/OPT4048DTSR/pcb.png"}" alt="PCB" width="120" height="80" />`;
-      } catch (error) {
-        core.warning(`Failed to read PCB PNG: ${error}`);
-        pcbCell = "*Error loading image*";
-      }
-    }
-    
-    if (schematicPreview) {
-      try {
-        const pngBuffer = fs.readFileSync(schematicPreview.pngFilePath);
-        const base64Png = pngBuffer.toString("base64");
-        const dataUrl = `data:image/png;base64,${base64Png}`;
-        schematicCell = `<img src="${dataUrl}" alt="Schematic" width="120" height="80" />`;
-      } catch (error) {
-        core.warning(`Failed to read Schematic PNG: ${error}`);
-        schematicCell = "*Error loading image*";
-      }
-    }
-    
-    return `| **${circuitName}** | ${pcbCell} | ${schematicCell} |`;
-  }).join("\n");
+  const tableRows = Array.from(circuitGroups.entries())
+    .map(([circuitName, meta]) => {
+      let pcbCell = "—";
+      let schematicCell = "—";
+
+      const pcbSvg = circuitGroups.get(circuitName)?.[0]?.svg.pcb;
+      const schematicSvg = circuitGroups.get(circuitName)?.[0]?.svg.schematic;
+
+      pcbCell = pcbSvg ?? "*Error loading PCB*";
+      schematicCell = schematicSvg ?? "*Error loading Schematic*";
+
+      return `| **${circuitGroups.get(circuitName)?.[0]?.path}** | ${pcbCell} | ${schematicCell} |`;
+    })
+    .join("\n");
 
   return `
 ## 📸 Circuit Previews
@@ -599,19 +546,7 @@ function createPRComment(data: {
   circuitCount: number;
   status: "ready" | "error" | "skipped";
   commitSha: string;
-  svgPreviews?: Array<{
-    name: string;
-    type: "pcb" | "schematic" | "3d";
-    svgContent: string;
-    svgFilePath: string;
-    pngFilePath?: string;
-  }>;
-  pngPreviews?: Array<{
-    name: string;
-    type: "pcb" | "schematic" | "3d";
-    pngFilePath: string;
-    svgFilePath: string;
-  }>;
+  snapshotResult: SnapshotResult;
 }): string {
   const {
     deploymentId,
@@ -620,7 +555,7 @@ function createPRComment(data: {
     circuitCount,
     status,
     commitSha,
-    pngPreviews,
+    snapshotResult,
   } = data;
 
   const deploymentTable = createDeploymentTable({
@@ -632,9 +567,10 @@ function createPRComment(data: {
     commitSha,
   });
 
-  const imagePreviewTable = pngPreviews && pngPreviews.length > 0 
-    ? createImagePreviewTable(pngPreviews) 
-    : "";
+  const imagePreviewTable =
+    snapshotResult.circuitFiles.length > 0
+      ? createImagePreviewTable(snapshotResult.circuitFiles)
+      : "";
 
   return `## 🔌 tscircuit deploy
 
