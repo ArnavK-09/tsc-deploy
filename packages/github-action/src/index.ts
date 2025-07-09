@@ -3,7 +3,7 @@ import * as github from '@actions/github';
 import { z } from 'zod';
 import { snapshotProject, getSvgPreviews, getPngPreviews } from './snapshot-project';
 import fs from 'node:fs';
-import { DEPLOY_URL } from '@tscircuit-deploy/shared/constants';
+import { DEPLOY_URL } from './constants';
 import { ulid } from 'ulid';
 
 const InputSchema = z.object({

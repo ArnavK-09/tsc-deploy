@@ -6,7 +6,7 @@
   "exports": {
     "./types": "./src/types/index.ts",
     "./utils": "./src/utils/index.ts",
-    "./db": "./src/db/index.ts",
+    "./db": "./src/db/index.ts"
   },
   "dependencies": {
     "@octokit/types": "^13.5.0",
