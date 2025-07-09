@@ -76,6 +76,7 @@ async function run(): Promise<void> {
         buildTime: totalTime,
         snapshotResult: deploymentResult.buildSnapshot,
       },
+      throwHttpErrors: false,
     });
 
     if (!response.ok) {
