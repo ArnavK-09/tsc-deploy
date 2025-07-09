@@ -81,6 +81,7 @@ async function run(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     core.setFailed(`❌ tscircuit Deploy failed: ${errorMessage}`);
+    process.exit(1);
   }
 }
 
@@ -195,7 +196,7 @@ async function handlePush(
   core.info(`📤 Processing push to ${branch}`);
 
   const circuitFiles = await findCircuitFiles(inputs.workingDirectory);
-  
+  console.log(circuitFiles);
   if (circuitFiles.length === 0) {
     core.warning('⚠️ No circuit files found - skipping deployment');
     return {
@@ -212,28 +213,28 @@ async function handlePush(
   let packageVersion: string | undefined;
 
   if (branch === 'main' || branch === 'master') {
-    core.info('🚀 Main branch detected - publishing package');
+    core.info('🚀 Main branch detected - publishing package - TODO PAUSED');
     
-    const lastTag = await getLastTag(octokit, context);
-    packageVersion = generateNextVersion(lastTag, context.payload.head_commit?.message || '');
+    // const lastTag = await getLastTag(octokit, context);
+    // packageVersion = generateNextVersion(lastTag, context.payload.head_commit?.message || '');
     
-    core.info(`📦 Publishing version ${packageVersion}`);
+    // core.info(`📦 Publishing version ${packageVersion}`);
 
-    await octokit.rest.git.createTag({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      tag: `v${packageVersion}`,
-      message: `Release v${packageVersion}`,
-      object: context.sha,
-      type: 'commit',
-    });
+    // await octokit.rest.git.createTag({
+    //   owner: context.repo.owner,
+    //   repo: context.repo.repo,
+    //   tag: `v${packageVersion}`,
+    //   message: `Release v${packageVersion}`,
+    //   object: context.sha,
+    //   type: 'commit',
+    // });
 
-    await octokit.rest.git.createRef({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      ref: `refs/tags/v${packageVersion}`,
-      sha: context.sha,
-    });
+    // await octokit.rest.git.createRef({
+    //   owner: context.repo.owner,
+    //   repo: context.repo.repo,
+    //   ref: `refs/tags/v${packageVersion}`,
+    //   sha: context.sha,
+    // });
   }
 
   return {
@@ -276,7 +277,7 @@ async function runTscircuitBuild(
   core.info('📦 Installing tscircuit CLI...');
   
   try {
-    await exec('npm', ['install', '-g', '@tscircuit/cli'], {
+    await exec('bun', ['install', '-g', '@tscircuit/cli'], {
       cwd: inputs.workingDirectory,
     });
   } catch (error) {
@@ -284,22 +285,23 @@ async function runTscircuitBuild(
   }
 
   core.info('🔨 Running tscircuit build...');
+  console.log('tscircuit build...', inputs.workingDirectory, circuitFiles);
   
-  try {
-    const timeoutMs = inputs.timeout * 60 * 1000;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Build timeout after ${inputs.timeout} minutes`)), timeoutMs);
-    });
+  // try {
+  //   const timeoutMs = inputs.timeout * 60 * 1000;
+  //   const timeoutPromise = new Promise<never>((_, reject) => {
+  //     setTimeout(() => reject(new Error(`Build timeout after ${inputs.timeout} minutes`)), timeoutMs);
+  //   });
 
-    await Promise.race([
-      exec('tscircuit', [inputs.args], {
-        cwd: inputs.workingDirectory,
-      }),
-      timeoutPromise
-    ]);
-  } catch (error) {
-    throw new Error(`tscircuit build failed: ${error}`);
-  }
+  //   await Promise.race([
+  //     exec('tscircuit', [inputs.args], {
+  //       cwd: inputs.workingDirectory,
+  //     }),
+  //     timeoutPromise
+  //   ]);
+  // } catch (error) {
+  //   throw new Error(`tscircuit build failed: ${error}`);
+  // }
 
   const buildTime = Math.round((Date.now() - startTime) / 1000);
   
