@@ -511,9 +511,9 @@ function createDeploymentTable(data: {
   return `
 ## ✨ tscircuit deploy
 
-| Name | Status | Preview | Circuits | Updated |
+| Deploment ID | Status | Preview | Circuits | Updated |
 | :--- | :----- | :------ | :------- | :------ |
-| **${deploymentId}** | ${statusDisplay} ([Inspect](${inspectUrl})) | ${status === "ready" ? `[Visit Preview](${previewUrl})` : "—"} | ${circuitCount} files | ${currentTime} |`.trim();
+| **${deploymentId.replace("deployment-", "")}** | ${statusDisplay} ([Inspect](${inspectUrl})) | ${status === "ready" ? `[Visit Preview](${previewUrl})` : "—"} | ${circuitCount} files | ${currentTime} |`.trim();
 }
 
 function createImagePreviewTable(
