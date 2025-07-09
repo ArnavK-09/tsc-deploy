@@ -276,13 +276,13 @@ async function runTscircuitBuild(
   
   core.info('📦 Installing tscircuit CLI...');
   
-  try {
-    await exec('bun', ['install', '-g', '@tscircuit/cli'], {
-      cwd: inputs.workingDirectory,
-    });
-  } catch (error) {
-    throw new Error(`Failed to install tscircuit CLI: ${error}`);
-  }
+  // try {
+  //   await exec('bun', ['install', '-g', '@tscircuit/cli'], {
+  //     cwd: inputs.workingDirectory,
+  //   });
+  // } catch (error) {
+  //   throw new Error(`Failed to install tscircuit CLI: ${error}`);
+  // }
 
   core.info('🔨 Running tscircuit build...');
   console.log('tscircuit build...', inputs.workingDirectory, circuitFiles);
