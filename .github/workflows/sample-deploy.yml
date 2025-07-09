@@ -28,7 +28,7 @@ jobs:
         working-directory: ./packages/github-action
         run: |
           bun install
-          bun x tsup ./src/index.ts
+          bun x tsup ./src/index.ts --format esm
 
       - name: Deploy tscircuit
         uses: ./packages/github-action
