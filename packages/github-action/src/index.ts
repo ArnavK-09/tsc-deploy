@@ -2,7 +2,8 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { exec } from '@actions/exec';
 import { z } from 'zod';
-import { snapshotProject, getSvgPreviews } from './snapshot-project';
+import { snapshotProject, getSvgPreviews, getPngPreviews } from './snapshot-project';
+import fs from 'node:fs';
 
 const InputSchema = z.object({
   args: z.string().default('deploy'),
@@ -209,8 +210,9 @@ async function handlePullRequest(
       }
     }
 
-    // Get SVG previews if snapshot result is available
+    // Get SVG and PNG previews if snapshot result is available
     const svgPreviews = buildResult.snapshotResult ? await getSvgPreviews(buildResult.snapshotResult) : undefined;
+    const pngPreviews = buildResult.snapshotResult ? await getPngPreviews(buildResult.snapshotResult) : undefined;
 
     const comment = createPRComment({
       deploymentId,
@@ -220,6 +222,7 @@ async function handlePullRequest(
       status: 'ready',
       commitSha: pullRequest.head.sha,
       svgPreviews,
+      pngPreviews,
     });
 
     await octokit.rest.issues.createComment({
@@ -436,12 +439,22 @@ async function runTscircuitBuild(
     core.info(`✅ Snapshot generation completed:`);
     core.info(`   • Circuit files found: ${snapshotResult.circuitFiles.length}`);
     core.info(`   • SVG snapshots created: ${snapshotResult.svgFiles.length}`);
+    core.info(`   • PNG snapshots created: ${snapshotResult.pngFiles.length}`);
     core.info(`   • Build time: ${snapshotResult.buildTime}s`);
     
     // Log SVG files for GitHub Actions output
     if (snapshotResult.svgFiles.length > 0) {
       core.startGroup('📸 Generated SVG Snapshots');
       snapshotResult.svgFiles.forEach(file => {
+        core.info(`  ${file}`);
+      });
+      core.endGroup();
+    }
+    
+    // Log PNG files for GitHub Actions output
+    if (snapshotResult.pngFiles.length > 0) {
+      core.startGroup('📸 Generated PNG Snapshots');
+      snapshotResult.pngFiles.forEach(file => {
         core.info(`  ${file}`);
       });
       core.endGroup();
@@ -506,28 +519,68 @@ function generateDeploymentId(): string {
   return `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 }
 
-function getSvgPreviewSection(svgPreviews: Array<{
-  name: string;
-  type: 'pcb' | 'schematic' | '3d';
-  svgContent: string;
-  filePath: string;
-}>): string {
-  const previewsToShow = svgPreviews.slice(0, 6);
+function getPngPreviewSection(
+  pngPreviews: Array<{
+    name: string;
+    type: 'pcb' | 'schematic' | '3d';
+    pngFilePath: string;
+    svgFilePath: string;
+  }>,
+  deploymentId: string
+): string {
+  const previewsToShow = pngPreviews.slice(0, 6);
   
   const previewItems = previewsToShow.map(preview => {
-    // Create a safe data URL for the SVG
-    const encodedSvg = Buffer.from(preview.svgContent).toString('base64');
-    const dataUrl = `data:image/svg+xml;base64,${encodedSvg}`;
+    // For GitHub comments, we can't embed images directly, so we'll reference them
+    // In a real deployment, these would be uploaded to a CDN or artifact storage
+    const fileName = require('node:path').basename(preview.pngFilePath);
     const typeEmoji = preview.type === 'pcb' ? '🟢' : preview.type === 'schematic' ? '📋' : '🎯';
     
     return `#### ${typeEmoji} ${preview.name} (${preview.type.toUpperCase()})
-![${preview.name} ${preview.type}](${dataUrl})`;
+![${preview.name} ${preview.type}](https://deploy.tscircuit.com/artifacts/${deploymentId}/${fileName})
+
+*📄 [Download PNG](https://deploy.tscircuit.com/artifacts/${deploymentId}/${fileName}) • [View SVG](https://deploy.tscircuit.com/artifacts/${deploymentId}/${require('node:path').basename(preview.svgFilePath)})*`;
   }).join('\n\n');
   
-  const extraCount = svgPreviews.length > 6 ? `\n\n*...and ${svgPreviews.length - 6} more previews available in the full deployment.*` : '';
+  const extraCount = pngPreviews.length > 6 ? `\n\n*...and ${pngPreviews.length - 6} more previews available in the full deployment.*` : '';
   
   return `
-### 📸 SVG Preview Snapshots
+### 📸 PNG Preview Snapshots
+
+${previewItems}${extraCount}
+`;
+}
+
+function createImagePreviewsFromPng(
+  pngPreviews: Array<{
+    name: string;
+    type: 'pcb' | 'schematic' | '3d';
+    pngFilePath: string;
+    svgFilePath: string;
+  }>
+): string {
+  const previewsToShow = pngPreviews.slice(0, 3);
+  
+  const previewItems = previewsToShow.map(preview => {
+    try {
+      // Read PNG file and convert to base64 for embedding
+      const pngBuffer = fs.readFileSync(preview.pngFilePath);
+      const base64Png = pngBuffer.toString('base64');
+      const dataUrl = `data:image/png;base64,${base64Png}`;
+      const typeEmoji = preview.type === 'pcb' ? '🟢' : preview.type === 'schematic' ? '📋' : '🎯';
+      
+      return `#### ${typeEmoji} ${preview.name} (${preview.type.toUpperCase()})
+![${preview.name} ${preview.type}](${dataUrl})`;
+    } catch (error) {
+      core.warning(`Failed to read PNG file for preview: ${error}`);
+      return `#### ${preview.name} (${preview.type.toUpperCase()}) - *Preview unavailable*`;
+    }
+  }).join('\n\n');
+  
+  const extraCount = pngPreviews.length > 3 ? `\n\n*...and ${pngPreviews.length - 3} more previews in the deployment.*` : '';
+  
+  return `
+### 📸 Circuit Preview Images
 
 ${previewItems}${extraCount}
 `;
@@ -544,10 +597,17 @@ function createPRComment(data: {
     name: string;
     type: 'pcb' | 'schematic' | '3d';
     svgContent: string;
-    filePath: string;
+    svgFilePath: string;
+    pngFilePath?: string;
+  }>;
+  pngPreviews?: Array<{
+    name: string;
+    type: 'pcb' | 'schematic' | '3d';
+    pngFilePath: string;
+    svgFilePath: string;
   }>;
 }): string {
-  const { deploymentId, previewUrl, buildTime, circuitCount, status, commitSha, svgPreviews } = data;
+  const { deploymentId, previewUrl, buildTime, circuitCount, status, commitSha, svgPreviews, pngPreviews } = data;
   
   const statusEmoji = {
     ready: '✅',
@@ -565,7 +625,7 @@ function createPRComment(data: {
 
 ${status === 'ready' ? `🔗 **Preview URL**: ${previewUrl}` : ''}
 📊 **Circuits Found**: ${circuitCount}
-📸 **SVG Snapshots**: ${svgCount} files (${circuitCount} × 3 views)
+📸 **Image Snapshots**: ${svgCount * 2} files (${circuitCount} × 6 views: SVG + PNG)
 ⏱️ **Build Time**: ${buildTime}
 🔧 **Commit**: \`${commitSha.substring(0, 7)}\`
 
@@ -577,20 +637,20 @@ For each circuit file, we've generated:
 - 📋 **Schematic View** - Electrical connections and component symbols  
 - 🎯 **3D View** - Isometric visualization of the assembled board
 
-${svgPreviews && svgPreviews.length > 0 ? getSvgPreviewSection(svgPreviews) : ''}
+${pngPreviews && pngPreviews.length > 0 ? createImagePreviewsFromPng(pngPreviews) : ''}
 
 ### 📁 Snapshot Files
-All generated SVG files are stored in \`.tscircuit/snapshots/\`:
-- \`[circuit-name]-pcb.svg\` - PCB layout visualization
-- \`[circuit-name]-schematic.svg\` - Circuit schematic diagram
-- \`[circuit-name]-3d.svg\` - 3D board rendering
+All generated files are stored in \`.tscircuit/snapshots/\`:
+- \`[circuit-name]-pcb.svg/.png\` - PCB layout visualization
+- \`[circuit-name]-schematic.svg/.png\` - Circuit schematic diagram
+- \`[circuit-name]-3d.svg/.png\` - 3D board rendering
 
 ### 🚀 What's Included
-- 📸 High-quality SVG circuit visualizations
-- 🔧 Interactive circuit previews
-- 📋 Professional PCB and schematic views
+- 📸 High-quality SVG and PNG circuit visualizations
+- 🔧 Interactive circuit previews with embedded PNG images
+- 📋 Professional PCB and schematic views in multiple formats
 - 📊 Component layout and connection diagrams
-- 🏭 Manufacturing-ready visualizations
+- 🏭 Manufacturing-ready visualizations for download
 
 [View deployment details →](${previewUrl}/deployment/${deploymentId})
 ` : ''}

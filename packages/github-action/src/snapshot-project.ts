@@ -9,6 +9,7 @@ import {
 import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d"
 import { CircuitRunner } from "tscircuit"
 import { relative } from "node:path"
+import { saveSvgAsPng, ImageFormat } from "./svg-to-png"
 
 const ALLOWED_FILE_EXTENSIONS = [
   ".tsx", ".ts", ".jsx", ".js",
@@ -38,6 +39,7 @@ export async function generateCircuitJsonStandalone({
 interface SnapshotResult {
   circuitFiles: string[]
   svgFiles: string[]
+  pngFiles: string[]
   buildTime: number
   success: boolean
   error?: string
@@ -48,13 +50,24 @@ interface CircuitSnapshot {
   pcbSvg: string
   schematicSvg: string
   threeDSvg: string
+  pcbPng: string
+  schematicPng: string
+  threeDPng: string
 }
 
 interface SvgPreview {
   name: string
   type: 'pcb' | 'schematic' | '3d'
   svgContent: string
-  filePath: string
+  svgFilePath: string
+  pngFilePath?: string
+}
+
+interface PngPreview {
+  name: string
+  type: 'pcb' | 'schematic' | '3d'
+  pngFilePath: string
+  svgFilePath: string
 }
 
 export async function getSvgPreviews(snapshotResult: SnapshotResult): Promise<SvgPreview[]> {
@@ -69,14 +82,52 @@ export async function getSvgPreviews(snapshotResult: SnapshotResult): Promise<Sv
                  : fileName.includes('-schematic.svg') ? 'schematic'
                  : '3d'
       
+      // Look for corresponding PNG file
+      const pngFile = snapshotResult.pngFiles.find(png => 
+        path.basename(png) === fileName.replace('.svg', '.png')
+      )
+      
       previews.push({
         name: baseName,
         type,
         svgContent,
-        filePath: svgFile
+        svgFilePath: svgFile,
+        pngFilePath: pngFile
       })
     } catch (error) {
       core.warning(`Failed to read SVG file ${svgFile}: ${error}`)
+    }
+  }
+  
+  return previews
+}
+
+export async function getPngPreviews(snapshotResult: SnapshotResult): Promise<PngPreview[]> {
+  const previews: PngPreview[] = []
+  
+  for (const pngFile of snapshotResult.pngFiles) {
+    try {
+      const fileName = path.basename(pngFile)
+      const baseName = fileName.replace(/-(pcb|schematic|3d)\.png$/, '')
+      const type = fileName.includes('-pcb.png') ? 'pcb' 
+                 : fileName.includes('-schematic.png') ? 'schematic'
+                 : '3d'
+      
+      // Look for corresponding SVG file
+      const svgFile = snapshotResult.svgFiles.find(svg => 
+        path.basename(svg) === fileName.replace('.png', '.svg')
+      )
+      
+      if (svgFile) {
+        previews.push({
+          name: baseName,
+          type,
+          pngFilePath: pngFile,
+          svgFilePath: svgFile
+        })
+      }
+    } catch (error) {
+      core.warning(`Failed to process PNG file ${pngFile}: ${error}`)
     }
   }
   
@@ -88,6 +139,7 @@ export async function snapshotProject(workingDirectory: string): Promise<Snapsho
   const result: SnapshotResult = {
     circuitFiles: [],
     svgFiles: [],
+    pngFiles: [],
     buildTime: 0,
     success: false
   }
@@ -112,18 +164,19 @@ export async function snapshotProject(workingDirectory: string): Promise<Snapsho
     const snapshotsDir = path.join(workingDirectory, '.tscircuit', 'snapshots')
     fs.mkdirSync(snapshotsDir, { recursive: true })
 
-    // Generate SVG snapshots for each circuit file
+    // Generate SVG and PNG snapshots for each circuit file
     for (const circuitFile of circuitFiles) {
       try {
-        const svgFiles = await generateCircuitSvgs(circuitFile, snapshotsDir, workingDirectory)
+        const { svgFiles, pngFiles } = await generateCircuitSvgs(circuitFile, snapshotsDir, workingDirectory)
         result.svgFiles.push(...svgFiles)
+        result.pngFiles.push(...pngFiles)
       } catch (error) {
-        core.warning(`Failed to generate SVGs for ${circuitFile}: ${error}`)
+        core.warning(`Failed to generate SVGs/PNGs for ${circuitFile}: ${error}`)
         // Continue with other files
       }
     }
 
-    core.info(`✅ Generated ${result.svgFiles.length} SVG snapshot(s)`)
+    core.info(`✅ Generated ${result.svgFiles.length} SVG snapshot(s) and ${result.pngFiles.length} PNG snapshot(s)`)
     result.success = true
     result.buildTime = Math.round((Date.now() - startTime) / 1000)
     
@@ -288,8 +341,9 @@ async function generateCircuitJson(filePath: string, workingDirectory: string): 
   }
 }
 
-async function generateCircuitSvgs(circuitFile: string, snapshotsDir: string, workingDirectory: string): Promise<string[]> {
+async function generateCircuitSvgs(circuitFile: string, snapshotsDir: string, workingDirectory: string): Promise<{ svgFiles: string[], pngFiles: string[] }> {
   const svgFiles: string[] = []
+  const pngFiles: string[] = []
   
   try {
     const baseName = path.basename(circuitFile, path.extname(circuitFile))
@@ -299,45 +353,63 @@ async function generateCircuitSvgs(circuitFile: string, snapshotsDir: string, wo
     
     if (!circuitJson || (Array.isArray(circuitJson) && circuitJson.length === 0)) {
       core.warning(`⚠️ No circuit data generated for ${circuitFile}`)
-      return []
+      return { svgFiles: [], pngFiles: [] }
     }
     
-    // Generate PCB SVG
+    // Generate PCB SVG and PNG
     try {
       const pcbSvg = convertCircuitJsonToPcbSvg(circuitJson)
-      const pcbPath = path.join(snapshotsDir, `${baseName}-pcb.svg`)
-      fs.writeFileSync(pcbPath, pcbSvg)
-      svgFiles.push(pcbPath)
-      core.info(`📸 Created PCB SVG: ${path.relative(process.cwd(), pcbPath)}`)
+      const pcbSvgPath = path.join(snapshotsDir, `${baseName}-pcb.svg`)
+      const pcbPngPath = path.join(snapshotsDir, `${baseName}-pcb.png`)
+      
+      fs.writeFileSync(pcbSvgPath, pcbSvg)
+      svgFiles.push(pcbSvgPath)
+      core.info(`📸 Created PCB SVG: ${path.relative(process.cwd(), pcbSvgPath)}`)
+      
+      // Generate PNG from SVG
+      await saveSvgAsPng(pcbSvgPath, pcbPngPath, { format: "pcb" })
+      pngFiles.push(pcbPngPath)
     } catch (error) {
-      core.warning(`Failed to generate PCB SVG for ${circuitFile}: ${error}`)
+      core.warning(`Failed to generate PCB SVG/PNG for ${circuitFile}: ${error}`)
     }
     
-    // Generate Schematic SVG
+    // Generate Schematic SVG and PNG
     try {
       const schematicSvg = convertCircuitJsonToSchematicSvg(circuitJson)
-      const schematicPath = path.join(snapshotsDir, `${baseName}-schematic.svg`)
-      fs.writeFileSync(schematicPath, schematicSvg)
-      svgFiles.push(schematicPath)
-      core.info(`📸 Created Schematic SVG: ${path.relative(process.cwd(), schematicPath)}`)
+      const schematicSvgPath = path.join(snapshotsDir, `${baseName}-schematic.svg`)
+      const schematicPngPath = path.join(snapshotsDir, `${baseName}-schematic.png`)
+      
+      fs.writeFileSync(schematicSvgPath, schematicSvg)
+      svgFiles.push(schematicSvgPath)
+      core.info(`📸 Created Schematic SVG: ${path.relative(process.cwd(), schematicSvgPath)}`)
+      
+      // Generate PNG from SVG
+      await saveSvgAsPng(schematicSvgPath, schematicPngPath, { format: "schematic" })
+      pngFiles.push(schematicPngPath)
     } catch (error) {
-      core.warning(`Failed to generate Schematic SVG for ${circuitFile}: ${error}`)
+      core.warning(`Failed to generate Schematic SVG/PNG for ${circuitFile}: ${error}`)
     }
     
-    // Generate 3D SVG
+    // Generate 3D SVG and PNG
     try {
       const threeDSvg = await convertCircuitJsonToSimple3dSvg(circuitJson)
-      const threeDPath = path.join(snapshotsDir, `${baseName}-3d.svg`)
-      fs.writeFileSync(threeDPath, threeDSvg)
-      svgFiles.push(threeDPath)
-      core.info(`📸 Created 3D SVG: ${path.relative(process.cwd(), threeDPath)}`)
+      const threeDSvgPath = path.join(snapshotsDir, `${baseName}-3d.svg`)
+      const threeDPngPath = path.join(snapshotsDir, `${baseName}-3d.png`)
+      
+      fs.writeFileSync(threeDSvgPath, threeDSvg)
+      svgFiles.push(threeDSvgPath)
+      core.info(`📸 Created 3D SVG: ${path.relative(process.cwd(), threeDSvgPath)}`)
+      
+      // Generate PNG from SVG
+      await saveSvgAsPng(threeDSvgPath, threeDPngPath, { format: "3d" })
+      pngFiles.push(threeDPngPath)
     } catch (error) {
-      core.warning(`Failed to generate 3D SVG for ${circuitFile}: ${error}`)
+      core.warning(`Failed to generate 3D SVG/PNG for ${circuitFile}: ${error}`)
     }
     
-    return svgFiles
+    return { svgFiles, pngFiles }
   } catch (error) {
-    core.error(`❌ Failed to create SVGs for ${circuitFile}: ${error}`)
-    return []
+    core.error(`❌ Failed to create SVGs/PNGs for ${circuitFile}: ${error}`)
+    return { svgFiles: [], pngFiles: [] }
   }
 }

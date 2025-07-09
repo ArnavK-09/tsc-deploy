@@ -18,8 +18,10 @@
     "@octokit/rest": "^21.1.1",
     "@tscircuit/eval": "^0.0.248",
     "@tscircuit/simple-3d-svg": "^0.0.22",
+    "canvas": "^2.11.2",
     "circuit-json-to-simple-3d": "latest",
     "circuit-to-svg": "^0.0.86",
+    "sharp": "^0.33.5",
     "tscircuit": "^0.0.522",
     "zod": "^3.25.76"
   },
