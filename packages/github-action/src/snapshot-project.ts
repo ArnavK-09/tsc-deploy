@@ -209,7 +209,6 @@ async function generateCircuitJson(filePath: string, workingDirectory: string): 
     core.info(`📄 Processing circuit file: ${absoluteFilePath}`)
     
     core.info(`📄 Processing circuit file: ${absoluteFilePath}`)
-    
     const runner = new CircuitRunner()
     const projectDir = path.dirname(absoluteFilePath)
     const relativeComponentPath = relative(projectDir, absoluteFilePath)
