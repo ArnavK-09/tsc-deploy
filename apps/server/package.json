@@ -1,23 +1,22 @@
 {
   "name": "@tscircuit-deploy/server",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "type": "module",
-  "private": true,
   "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --outdir ./dist --target node",
-    "check-types": "tsc --noEmit"
+    "dev": "bun --hot src/index.ts",
+    "build": "bun build src/index.ts --outdir dist",
+    "start": "bun src/index.ts"
   },
   "dependencies": {
     "@tscircuit-deploy/shared": "workspace:*",
-    "drizzle-orm": "^0.36.4",
-    "hono": "^4.8.4",
-    "postgres": "^3.4.4",
-    "zod": "^4.0.0"
+    "hono": "^4.6.13",
+    "drizzle-orm": "^0.38.2",
+    "zod": "^3.24.1",
+    "@actions/github": "^6.0.0",
+    "hono-cors": "^0.2.8"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5.8.2"
+    "typescript": "^5.7.2"
   }
 }

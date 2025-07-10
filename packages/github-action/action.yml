@@ -16,6 +16,15 @@ inputs:
     required: false
     default: "."
 
+  deploy-server-url:
+    description: "URL of the tscircuit deploy server"
+    required: false
+    default: "https://api.deploy.tscircuit.com"
+
+  api-secret:
+    description: "API secret for authenticating with the deploy server"
+    required: false
+
 outputs:
   deployment-id:
     description: "Unique identifier for this deployment"
