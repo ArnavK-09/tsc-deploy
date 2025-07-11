@@ -3,11 +3,9 @@ import { z } from "zod";
 const EnvSchema = z.object({
   PORT: z.string().default("3001").transform(Number),
   GITHUB_BOT_TOKEN: z.string(),
-  GITHUB_APP_TOKEN: z.string().optional(),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  API_SECRET: z.string().optional(),
   DATABASE_URL: z.string().optional(),
 });
 

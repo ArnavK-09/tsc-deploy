@@ -19,11 +19,12 @@ inputs:
   deploy-server-url:
     description: "URL of the tscircuit deploy server"
     required: false
-    default: "https://api.deploy.tscircuit.com"
+    default: "https://deploy.tscircuit.com"
 
-  api-secret:
-    description: "API secret for authenticating with the deploy server"
+  create-release:
+    description: "Create a release for the project"
     required: false
+    default: "false"
 
 outputs:
   deployment-id:

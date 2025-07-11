@@ -5,16 +5,17 @@ import snapshotProject, { findCircuitFiles } from "./snapshot-project";
 import { DEPLOY_URL, DEPLOY_SERVER_URL } from "./constants";
 import { ulid } from "ulid";
 import ky from "ky";
-import { SnapshotResult } from "@tscircuit-deploy/shared/types";
+import { DeploymentRequest, SnapshotResult } from "@tscircuit-deploy/shared/types";
+import { GitHubService } from "@tscircuit-deploy/shared/services";
 
 const InputSchema = z.object({
   githubToken: z.string(),
   workingDirectory: z.string().default("."),
-  deployServerUrl: z.string().default(DEPLOY_SERVER_URL),
-  apiSecret: z.string().optional(),
+  deployServerUrl: z.string().default(DEPLOY_SERVER_URL).optional(),
+  create_release: z.boolean().default(false).optional()
 });
 
-interface DeploymentResult {
+export interface DeploymentResult {
   deploymentId: string;
   previewUrl?: string;
   packageVersion?: string;
@@ -29,10 +30,14 @@ async function run(): Promise<void> {
       githubToken: core.getInput("github-token"),
       workingDirectory: core.getInput("working-directory"),
       deployServerUrl: core.getInput("deploy-server-url") || DEPLOY_SERVER_URL,
-      apiSecret: core.getInput("api-secret"),
+      create_release: core.getInput("create-release") === "true"
     });
 
     const context = github.context;
+    const userOctokit = new GitHubService({
+      token: inputs.githubToken,
+    });
+    const ID = ulid();
 
     core.info(`\n🔌 Starting tscircuit Deploy`);
     core.info(`\tRepository: ${context.repo.owner}/${context.repo.repo}`);
@@ -51,16 +56,50 @@ async function run(): Promise<void> {
       return;
     }
 
-    core.info(`📋 Found ${circuitFiles.length} circuit file(s)\n`);
-
-    const deploymentId = `deployment-${ulid()}`;
-
+    core.info(`📋 Found ${circuitFiles.length} circuit file(s), Building...\n`);
     const buildResult = await runTscircuitBuild(inputs, circuitFiles);
+    const { deploymentId } = await userOctokit.createDeployment({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      ref: context.sha,
+      environment:
+        context.eventName === "push"
+          ? context.ref === "refs/heads/main" ||
+            context.ref === "refs/heads/master"
+            ? "production"
+            : "staging"
+          : "preview",
+      description: `Deploy to ${context.eventName === "push" ? (context.ref === "refs/heads/main" || context.ref === "refs/heads/master" ? "production" : "staging") : "preview"} from ${context.sha}`,
+      payload: {
+        deploymentId: `deployment-${ID}`,
+        pullRequestNumber: context.eventName === "pull_request" ? (context.payload.pull_request?.number?.toString() || "") : context.sha,
+        circuitCount: buildResult.snapshotResult.circuitFiles.length,
+      }
+    })
+
+    let checkRunId: number | undefined
+    if (context.eventName == 'pull_request') {
+      const { checkRunId: checkRunIdCreated } = await userOctokit.createCheckRun({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        name: "tscircuit deploy",
+        headSha: context.payload.pull_request?.head.sha || context.sha,
+        status: "in_progress",
+        detailsUrl: `${DEPLOY_URL}/deployments/${deploymentId}`,
+        output: {
+          title: "🔃 Building Preview Deploy",
+          summary: `Found ${buildResult.snapshotResult.circuitFiles.length} circuit file${buildResult.snapshotResult.circuitFiles.length === 1 ? "" : "s"}. Starting build...`,
+        },
+      })
+
+      checkRunId = checkRunIdCreated
+
+    }
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
 
-    const deploymentRequest = {
-      deploymentId,
+    const deploymentRequest: DeploymentRequest = {
+      id: ID,
       owner: context.repo.owner,
       repo: context.repo.repo,
       ref: context.sha,
@@ -72,93 +111,63 @@ async function run(): Promise<void> {
             : "staging"
           : "preview",
       eventType: context.eventName,
-      pullRequest:
-        context.eventName === "pull_request" && context.payload.pull_request
-          ? {
-              number: context.payload.pull_request.number,
-              headSha: context.payload.pull_request.head.sha,
-            }
-          : undefined,
+      meta: context.eventName === "pull_request" ? (context.payload.pull_request?.number?.toString() || "") : context.sha,
       context: {
         serverUrl: context.serverUrl,
         runId: context.runId.toString(),
+        sha: context.payload.pull_request?.head.sha || context.sha,
+        message: context.payload.head_commit?.message || ""
       },
       snapshotResult: buildResult.snapshotResult,
       buildTime: totalTime,
-      userToken: inputs.githubToken,
+      deploymentId: Number(deploymentId),
+      checkRunId: checkRunId,
+      create_release: context.eventName == 'push' && (inputs.create_release || false)
     };
 
-    try {
-      const response = await ky.post(
-        `${inputs.deployServerUrl}/deployments/process`,
-        {
-          json: deploymentRequest,
-          timeout: 60000,
-          retry: {
-            limit: 3,
-            methods: ["post"],
-          },
-          headers: inputs.apiSecret
-            ? { Authorization: `Bearer ${inputs.apiSecret}` }
-            : undefined,
+    const response = await ky.post(
+      `${inputs.deployServerUrl}/deployments/process`,
+      {
+        json: deploymentRequest,
+        timeout: 60000,
+        retry: {
+          limit: 3,
+          methods: ["post"],
         },
-      );
-
-      const result = await response.json<{
-        success: boolean;
-        deploymentId: string;
-        previewUrl?: string;
-        deploymentUrl?: string;
-        error?: string;
-      }>();
-
-      if (!result.success) {
-        throw new Error(result.error || "Deployment processing failed");
-      }
-
-      const previewUrl = result.previewUrl || result.deploymentUrl;
-
-      core.setOutput("deployment-id", deploymentId);
-      core.setOutput("build-time", totalTime.toString());
-      core.setOutput("circuit-count", circuitFiles.length.toString());
-      core.setOutput("status", "ready");
-
-      if (previewUrl) {
-        core.setOutput("preview-url", previewUrl);
-      }
-
-      core.info(`\n✅ Deployment completed successfully`);
-      core.info(`🆔 Deployment ID: ${deploymentId}`);
-      core.info(`⏱️ Total time: ${totalTime}s`);
-      core.info(`📊 Circuits processed: ${circuitFiles.length}`);
-
-      if (previewUrl) {
-        core.info(`\n🔗 Preview URL: ${previewUrl}`);
-      }
-    } catch (error) {
-      core.error(`Failed to process deployment on server: ${error}`);
-
-      await ky.post(`${inputs.deployServerUrl}/deployments/create`, {
-        json: {
-          id: deploymentId,
-          meta: JSON.stringify(context.payload),
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          commitSha: context.sha,
-          buildLogs: "",
-          errorMessage:
-            error instanceof Error ? error.message : "Unknown error",
-          metaType: context.eventName,
-          buildTime: totalTime,
-          snapshotResult: buildResult.snapshotResult,
+        headers: {
+          Authorization: `Bearer ${inputs.githubToken}`,
         },
-        throwHttpErrors: false,
-        headers: inputs.apiSecret
-          ? { Authorization: `Bearer ${inputs.apiSecret}` }
-          : undefined,
-      });
+      },
+    );
 
-      throw error;
+    const result = await response.json<{
+      success: boolean;
+      previewUrl?: string;
+      error?: string;
+    }>();
+
+    if (!result.success) {
+      throw new Error(result.error || "Deployment processing failed");
+    }
+
+    const previewUrl = result.previewUrl;
+
+    core.setOutput("deployment-id", deploymentId);
+    core.setOutput("build-time", totalTime.toString());
+    core.setOutput("circuit-count", circuitFiles.length.toString());
+    core.setOutput("status", "ready");
+
+    if (previewUrl) {
+      core.setOutput("preview-url", previewUrl);
+    }
+
+    core.info(`\n✅ Deployment completed successfully`);
+    core.info(`🆔 Deployment ID: ${deploymentId}`);
+    core.info(`⏱️ Total time: ${totalTime}s`);
+    core.info(`📊 Circuits processed: ${circuitFiles.length}`);
+
+    if (previewUrl) {
+      core.info(`\n🔗 Preview URL: ${previewUrl}`);
     }
   } catch (error) {
     const errorMessage =

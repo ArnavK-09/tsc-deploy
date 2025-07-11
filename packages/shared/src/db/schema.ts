@@ -5,6 +5,7 @@ import {
   integer,
   varchar,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const deploymentStatus = pgEnum("deployment_status", [
@@ -27,6 +28,7 @@ export const deployments = pgTable("deployments", {
   metaType: metaType("meta_type").notNull(),
   buildCompletedAt: timestamp("build_completed_at"),
   buildDuration: integer("build_duration"),
-  circuitFiles: integer("circuit_count").default(0),
+  totalCircuitFiles: integer("circuit_count").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  snapshotResult: jsonb("snapshot_result"),
 });

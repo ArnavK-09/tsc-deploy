@@ -2,19 +2,18 @@ import * as github from "@actions/github";
 import { z } from "zod";
 
 const GitHubConfigSchema = z.object({
-  botToken: z.string(),
-  appToken: z.string().optional(),
+  token: z.string(),
 });
 
 type GitHubConfig = z.infer<typeof GitHubConfigSchema>;
 
 export class GitHubService {
-  private botOctokit: ReturnType<typeof github.getOctokit>;
+  private octokit: ReturnType<typeof github.getOctokit>;
   private config: GitHubConfig;
 
   constructor(config: GitHubConfig) {
     this.config = GitHubConfigSchema.parse(config);
-    this.botOctokit = github.getOctokit(this.config.botToken);
+    this.octokit = github.getOctokit(this.config.token);
   }
 
   async createDeployment(params: {
@@ -26,7 +25,7 @@ export class GitHubService {
     payload: Record<string, unknown>;
   }): Promise<{ deploymentId: number | undefined }> {
     try {
-      const deployment = await this.botOctokit.rest.repos.createDeployment({
+      const deployment = await this.octokit.rest.repos.createDeployment({
         owner: params.owner,
         repo: params.repo,
         ref: params.ref,
@@ -57,7 +56,7 @@ export class GitHubService {
     logUrl: string;
   }): Promise<void> {
     try {
-      await this.botOctokit.rest.repos.createDeploymentStatus({
+      await this.octokit.rest.repos.createDeploymentStatus({
         owner: params.owner,
         repo: params.repo,
         deployment_id: params.deploymentId,
@@ -93,7 +92,7 @@ export class GitHubService {
       | "timed_out";
   }): Promise<{ checkRunId: number | undefined }> {
     try {
-      const checkRun = await this.botOctokit.rest.checks.create({
+      const checkRun = await this.octokit.rest.checks.create({
         owner: params.owner,
         repo: params.repo,
         name: params.name,
@@ -131,7 +130,7 @@ export class GitHubService {
     };
   }): Promise<void> {
     try {
-      await this.botOctokit.rest.checks.update({
+      await this.octokit.rest.checks.update({
         owner: params.owner,
         repo: params.repo,
         check_run_id: params.checkRunId,
@@ -153,7 +152,7 @@ export class GitHubService {
     body: string;
   }): Promise<void> {
     try {
-      await this.botOctokit.rest.issues.createComment({
+      await this.octokit.rest.issues.createComment({
         owner: params.owner,
         repo: params.repo,
         issue_number: params.issueNumber,
@@ -185,19 +184,89 @@ export class GitHubService {
       throw error;
     }
   }
-}
 
-let githubService: GitHubService | null = null;
+  async getLatestTag(params: {
+    owner: string;
+    repo: string;
+  }): Promise<{ tag: string | null }> {
+    try {
+      const tags = await this.octokit.rest.repos.listTags({
+        owner: params.owner,
+        repo: params.repo,
+        per_page: 1,
+      });
 
-export function initializeGitHubService(config: GitHubConfig): void {
-  githubService = new GitHubService(config);
-}
-
-export function getGitHubService(): GitHubService {
-  if (!githubService) {
-    throw new Error(
-      "GitHubService not initialized. Call initializeGitHubService first.",
-    );
+      if (tags.data.length > 0) {
+        return { tag: tags.data[0].name };
+      }
+      return { tag: null };
+    } catch (error) {
+      console.error("Failed to get latest tag:", error);
+      return { tag: null };
+    }
   }
-  return githubService;
+
+  async createTag(params: {
+    owner: string;
+    repo: string;
+    tag: string;
+    message: string;
+    object: string;
+    type: "commit" | "tree" | "blob";
+  }): Promise<{ tagSha: string | undefined }> {
+    try {
+      const tagObject = await this.octokit.rest.git.createTag({
+        owner: params.owner,
+        repo: params.repo,
+        tag: params.tag,
+        message: params.message,
+        object: params.object,
+        type: params.type,
+      });
+
+      return { tagSha: tagObject.data.sha };
+    } catch (error) {
+      console.error("Failed to create tag:", error);
+      return { tagSha: undefined };
+    }
+  }
+
+  async createRef(params: {
+    owner: string;
+    repo: string;
+    ref: string;
+    sha: string;
+  }): Promise<{ success: boolean }> {
+    try {
+      await this.octokit.rest.git.createRef({
+        owner: params.owner,
+        repo: params.repo,
+        ref: params.ref,
+        sha: params.sha,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to create ref:", error);
+      return { success: false };
+    }
+  }
+
+  generateNextVersion(lastTag: string | null, commitMessage: string): string {
+    let currentVersion = "0.0.0";
+    
+    if (lastTag) {
+      currentVersion = lastTag.replace(/^v/, "");
+    }
+
+    const [major, minor, patch] = currentVersion.split(".").map(Number);
+
+    if (commitMessage.includes("[major]") || commitMessage.includes("BREAKING CHANGE")) {
+      return `${major + 1}.0.0`;
+    } else if (commitMessage.includes("[minor]") || commitMessage.includes("feat:")) {
+      return `${major}.${minor + 1}.0`;
+    } else {
+      return `${major}.${minor}.${patch + 1}`;
+    }
+  }
 }
