@@ -1,9 +1,11 @@
 import sharp from "sharp";
 
 export type ImageFormat = "schematic" | "pcb" | "assembly" | "3d";
-import { convertCircuitJsonToPcbSvg, convertCircuitJsonToSchematicSvg } from "circuit-to-svg";
+import {
+  convertCircuitJsonToPcbSvg,
+  convertCircuitJsonToSchematicSvg,
+} from "circuit-to-svg";
 import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d";
-
 
 interface ConvertSvgToPngOptions {
   width?: number;
@@ -35,7 +37,6 @@ export const convertSvgToPng = async (
     );
   }
 };
-
 
 export const createPngFromCircuitJson = async (
   circuitJson: any,
