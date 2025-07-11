@@ -8,6 +8,14 @@ import { generatePRComment } from "../utils/pr-comment";
 
 const router = new Hono();
 
+router.get("/deployments", async (c) => {
+  const result = await db.select().from(deployments);
+  return c.json({
+    success: true,
+    deployments: result,
+  });
+});
+
 router.post("/process", async (c) => {
   const body = await c.req.json();
   const deploymentRequest = DeploymentRequestSchema.parse(body);

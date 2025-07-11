@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@octokit/types": "^14.1.0",
+    "@vercel/postgres": "^0.10.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

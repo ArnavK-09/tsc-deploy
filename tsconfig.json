@@ -18,7 +18,7 @@
     "useDefineForClassFields": true
   },
   "include": [],
-  "exclude": ["node_modules", "dist", "build"],
+  "exclude": ["node_modules", "dist", "build", "/sample-*"],
   "references": [
     { "path": "./apps/server" },
     { "path": "./packages/shared" },
