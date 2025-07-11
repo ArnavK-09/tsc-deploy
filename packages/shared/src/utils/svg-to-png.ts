@@ -1,9 +1,9 @@
 import sharp from "sharp";
-import fs from "node:fs";
-import path from "node:path";
-import * as core from "@actions/core";
 
 export type ImageFormat = "schematic" | "pcb" | "assembly" | "3d";
+import { convertCircuitJsonToPcbSvg, convertCircuitJsonToSchematicSvg } from "circuit-to-svg";
+import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d";
+
 
 interface ConvertSvgToPngOptions {
   width?: number;
@@ -36,40 +36,12 @@ export const convertSvgToPng = async (
   }
 };
 
-export const saveSvgAsPng = async (
-  svgFilePath: string,
-  outputPath: string,
-  options: ConvertSvgToPngOptions = { format: "pcb" },
-): Promise<string> => {
-  try {
-    const svgContent = fs.readFileSync(svgFilePath, "utf-8");
-    const pngBuffer = await convertSvgToPng(svgContent, options);
-
-    fs.writeFileSync(outputPath, pngBuffer);
-    core.info(`📸 Created PNG: ${path.relative(process.cwd(), outputPath)}`);
-
-    return outputPath;
-  } catch (error) {
-    throw new Error(
-      `Failed to save SVG as PNG: ${error instanceof Error ? error.message : error}`,
-    );
-  }
-};
 
 export const createPngFromCircuitJson = async (
   circuitJson: any,
-  fileName: string,
-  outputDir: string,
   format: ImageFormat,
   options: ConvertSvgToPngOptions = { format },
-): Promise<string> => {
-  const { convertCircuitJsonToPcbSvg, convertCircuitJsonToSchematicSvg } =
-    await import("circuit-to-svg");
-
-  const { convertCircuitJsonToSimple3dSvg } = await import(
-    "circuit-json-to-simple-3d"
-  );
-
+): Promise<Buffer> => {
   try {
     let svg: string;
 
@@ -89,14 +61,7 @@ export const createPngFromCircuitJson = async (
     }
 
     const pngBuffer = await convertSvgToPng(svg, { ...options, format });
-    const outputPath = path.join(outputDir, `${fileName}-${format}.png`);
-
-    fs.writeFileSync(outputPath, pngBuffer);
-    core.info(
-      `📸 Created ${format.toUpperCase()} PNG: ${path.relative(process.cwd(), outputPath)}`,
-    );
-
-    return outputPath;
+    return pngBuffer;
   } catch (error) {
     throw new Error(
       `Failed to create ${format} PNG: ${error instanceof Error ? error.message : error}`,

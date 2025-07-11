@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { version } from "../../../package.json";
 import { env } from "@tscircuit-deploy/shared/constants";
 import { GitHubService } from "@tscircuit-deploy/shared/services";
 import { apiAuth } from "./middleware/github-token-expected";
@@ -19,9 +18,7 @@ app.use("*", logger());
 
 app.get("/", (c) => {
   return c.json({
-    name: "tscircuit Deploy Bot",
-    version: version,
-    status: "running",
+    hello: "world",
   });
 });
 
