@@ -20,8 +20,8 @@
   "include": [],
   "exclude": ["node_modules", "dist", "build"],
   "references": [
-    { "path": "./apps/bot" },
     { "path": "./apps/server" },
-    { "path": "./packages/shared" }
+    { "path": "./packages/shared" },
+    { "path": "./packages/github-action" }
   ]
 }

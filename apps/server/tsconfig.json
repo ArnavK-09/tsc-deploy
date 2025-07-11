@@ -11,6 +11,10 @@
     "noEmit": true,
     "types": ["bun-types"]
   },
-  "include": ["src/**/*", "../../packages/shared/src/services"],
+  "include": [
+    "src/**/*",
+    "../../packages/shared/src/services",
+    "../../packages/shared/src/constants/env.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

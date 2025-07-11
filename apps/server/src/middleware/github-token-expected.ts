@@ -41,7 +41,7 @@ export async function optionalGithubToken(c: Context, next: Next) {
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
     const isValid = await verifyGitHubToken(token);
-    
+
     if (isValid) {
       c.set("githubToken", token);
     }

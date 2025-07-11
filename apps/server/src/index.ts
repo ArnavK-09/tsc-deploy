@@ -2,13 +2,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { version } from "../../../package.json";
-import { env } from "./config/env";
+import { env } from "@tscircuit-deploy/shared/constants";
 import { GitHubService } from "@tscircuit-deploy/shared/services";
-import githubRouter from "./routes/github.routes";
-import deploymentsRouter from "./routes/deployments.routes";
 import { apiAuth } from "./middleware/github-token-expected";
+import apiRouter from "./routes/api.routes";
 
-const port = 6009
+const port = 3000;
 export const app = new Hono();
 
 export const botOctokit = new GitHubService({
@@ -36,10 +35,7 @@ app.get("/health", (c) => {
 });
 
 app.use("/*", apiAuth);
-app.route("/api/github", githubRouter);
-
-app.use("/deployments/*", apiAuth);
-app.route("/deployments", deploymentsRouter);
+app.route("/", apiRouter);
 
 app.notFound((c) => {
   return c.json({ error: "Not found" }, 404);

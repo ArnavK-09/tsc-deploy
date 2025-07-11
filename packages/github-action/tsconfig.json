@@ -11,6 +11,6 @@
     "noEmit": true,
     "types": ["bun-types"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../shared/src/utils/svg-to-png.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

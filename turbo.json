@@ -15,10 +15,6 @@
       "dependsOn": ["build"],
       "cache": false
     },
-    "lint": {
-      "dependsOn": ["^lint"],
-      "inputs": ["$TURBO_DEFAULT$", ".eslintrc*", "eslint.config.*"]
-    },
     "check-types": {
       "dependsOn": ["^check-types"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "**/*.ts", "**/*.tsx"]
@@ -31,15 +27,5 @@
       "cache": false
     }
   },
-  "globalEnv": [
-    "NODE_ENV",
-    "DATABASE_URL",
-    "GITHUB_APP_ID",
-    "GITHUB_PRIVATE_KEY",
-    "GITHUB_WEBHOOK_SECRET",
-    "GITHUB_CLIENT_ID",
-    "GITHUB_CLIENT_SECRET",
-    "BOT_PORT",
-    "SERVER_PORT"
-  ]
+  "globalEnv": ["NODE_ENV", "DATABASE_URL", "GITHUB_BOT_TOKEN"]
 }

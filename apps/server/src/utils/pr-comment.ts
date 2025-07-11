@@ -6,16 +6,8 @@ export function createDeploymentTable(data: {
   buildTime: string;
   circuitCount: number;
   status: "ready" | "error" | "skipped";
-  commitSha: string;
 }): string {
-  const {
-    deploymentId,
-    previewUrl,
-    buildTime,
-    circuitCount,
-    status,
-    commitSha,
-  } = data;
+  const { deploymentId, previewUrl, circuitCount, status } = data;
 
   const statusDisplay = {
     ready: "✅ Ready",
@@ -81,7 +73,6 @@ export function generatePRComment(data: {
   buildTime: string;
   circuitCount: number;
   status: "ready" | "error" | "skipped";
-  commitSha: string;
   snapshotResult: SnapshotResult;
 }): string {
   const {
@@ -90,7 +81,6 @@ export function generatePRComment(data: {
     buildTime,
     circuitCount,
     status,
-    commitSha,
     snapshotResult,
   } = data;
 
@@ -100,7 +90,6 @@ export function generatePRComment(data: {
     buildTime,
     circuitCount,
     status,
-    commitSha,
   });
 
   const imagePreviewTable =

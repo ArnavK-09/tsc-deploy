@@ -7,13 +7,10 @@
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "start": "turbo run start --parallel",
-    "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "check-types": "turbo run check-types",
-    "clean": "turbo run clean && rm -rf node_modules",
-    "db:migrate": "bun run --cwd packages/shared migrate",
-    "db:studio": "bun run --cwd packages/shared studio"
+    "check": "tsc --noEmit",
+    "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
     "prettier": "^3.6.0",
@@ -29,14 +26,6 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "keywords": [
-    "tscircuit",
-    "deploy",
-    "electronics",
-    "pcb",
-    "github-app",
-    "ci-cd"
   ],
   "repository": {
     "type": "git",

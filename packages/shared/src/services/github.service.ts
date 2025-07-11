@@ -254,16 +254,22 @@ export class GitHubService {
 
   generateNextVersion(lastTag: string | null, commitMessage: string): string {
     let currentVersion = "0.0.0";
-    
+
     if (lastTag) {
       currentVersion = lastTag.replace(/^v/, "");
     }
 
     const [major, minor, patch] = currentVersion.split(".").map(Number);
 
-    if (commitMessage.includes("[major]") || commitMessage.includes("BREAKING CHANGE")) {
+    if (
+      commitMessage.includes("[major]") ||
+      commitMessage.includes("BREAKING CHANGE")
+    ) {
       return `${major + 1}.0.0`;
-    } else if (commitMessage.includes("[minor]") || commitMessage.includes("feat:")) {
+    } else if (
+      commitMessage.includes("[minor]") ||
+      commitMessage.includes("feat:")
+    ) {
       return `${major}.${minor + 1}.0`;
     } else {
       return `${major}.${minor}.${patch + 1}`;

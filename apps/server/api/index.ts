@@ -2,13 +2,13 @@
  * Import the 'handle' function from the 'hono/vercel' package.
  * This function is used to create a request handler for the Vercel platform.
  */
-import { handle } from 'hono/vercel'
+import { handle } from "hono/vercel";
 
 /**
  * Import the 'app' instance from the server source.
  * This instance represents the application logic and routes.
  */
-import { app } from '../src'
+import { app } from "../src";
 
 /**
  * Create a request handler using the 'handle' function.

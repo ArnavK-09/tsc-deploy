@@ -34,6 +34,6 @@ jobs:
         uses: ./packages/github-action
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          args: "deploy --verbose"
-          timeout: "10"
           working-directory: "."
+          deploy-server-url: https://deploy-tsc-test.vercel.app
+          create-release: false

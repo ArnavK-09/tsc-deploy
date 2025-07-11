@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 const EnvSchema = z.object({
-  PORT: z.string().default("3001").transform(Number),
   GITHUB_BOT_TOKEN: z.string(),
   NODE_ENV: z
     .enum(["development", "production", "test"])

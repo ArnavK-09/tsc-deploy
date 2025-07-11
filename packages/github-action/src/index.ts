@@ -2,17 +2,23 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { z } from "zod";
 import snapshotProject, { findCircuitFiles } from "./snapshot-project";
-import { DEPLOY_URL, DEPLOY_SERVER_URL } from "./constants";
+import {
+  DEPLOY_URL,
+  DEPLOY_SERVER_URL,
+} from "@tscircuit-deploy/shared/constants";
 import { ulid } from "ulid";
 import ky from "ky";
-import { DeploymentRequest, SnapshotResult } from "@tscircuit-deploy/shared/types";
+import {
+  DeploymentRequest,
+  SnapshotResult,
+} from "@tscircuit-deploy/shared/types";
 import { GitHubService } from "@tscircuit-deploy/shared/services";
 
 const InputSchema = z.object({
   githubToken: z.string(),
   workingDirectory: z.string().default("."),
   deployServerUrl: z.string().default(DEPLOY_SERVER_URL).optional(),
-  create_release: z.boolean().default(false).optional()
+  create_release: z.boolean().default(false).optional(),
 });
 
 export interface DeploymentResult {
@@ -30,7 +36,7 @@ async function run(): Promise<void> {
       githubToken: core.getInput("github-token"),
       workingDirectory: core.getInput("working-directory"),
       deployServerUrl: core.getInput("deploy-server-url") || DEPLOY_SERVER_URL,
-      create_release: core.getInput("create-release") === "true"
+      create_release: core.getInput("create-release") === "true",
     });
 
     const context = github.context;
@@ -72,28 +78,31 @@ async function run(): Promise<void> {
       description: `Deploy to ${context.eventName === "push" ? (context.ref === "refs/heads/main" || context.ref === "refs/heads/master" ? "production" : "staging") : "preview"} from ${context.sha}`,
       payload: {
         deploymentId: `deployment-${ID}`,
-        pullRequestNumber: context.eventName === "pull_request" ? (context.payload.pull_request?.number?.toString() || "") : context.sha,
+        pullRequestNumber:
+          context.eventName === "pull_request"
+            ? context.payload.pull_request?.number?.toString() || ""
+            : context.sha,
         circuitCount: buildResult.snapshotResult.circuitFiles.length,
-      }
-    })
+      },
+    });
 
-    let checkRunId: number | undefined
-    if (context.eventName == 'pull_request') {
-      const { checkRunId: checkRunIdCreated } = await userOctokit.createCheckRun({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        name: "tscircuit deploy",
-        headSha: context.payload.pull_request?.head.sha || context.sha,
-        status: "in_progress",
-        detailsUrl: `${DEPLOY_URL}/deployments/${deploymentId}`,
-        output: {
-          title: "🔃 Building Preview Deploy",
-          summary: `Found ${buildResult.snapshotResult.circuitFiles.length} circuit file${buildResult.snapshotResult.circuitFiles.length === 1 ? "" : "s"}. Starting build...`,
-        },
-      })
+    let checkRunId: number | undefined;
+    if (context.eventName == "pull_request") {
+      const { checkRunId: checkRunIdCreated } =
+        await userOctokit.createCheckRun({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          name: "tscircuit deploy",
+          headSha: context.payload.pull_request?.head.sha || context.sha,
+          status: "in_progress",
+          detailsUrl: `${DEPLOY_URL}/deployments/${deploymentId}`,
+          output: {
+            title: "🔃 Building Preview Deploy",
+            summary: `Found ${buildResult.snapshotResult.circuitFiles.length} circuit file${buildResult.snapshotResult.circuitFiles.length === 1 ? "" : "s"}. Starting build...`,
+          },
+        });
 
-      checkRunId = checkRunIdCreated
-
+      checkRunId = checkRunIdCreated;
     }
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
@@ -111,18 +120,22 @@ async function run(): Promise<void> {
             : "staging"
           : "preview",
       eventType: context.eventName,
-      meta: context.eventName === "pull_request" ? (context.payload.pull_request?.number?.toString() || "") : context.sha,
+      meta:
+        context.eventName === "pull_request"
+          ? context.payload.pull_request?.number?.toString() || ""
+          : context.sha,
       context: {
         serverUrl: context.serverUrl,
         runId: context.runId.toString(),
         sha: context.payload.pull_request?.head.sha || context.sha,
-        message: context.payload.head_commit?.message || ""
+        message: context.payload.head_commit?.message || "",
       },
       snapshotResult: buildResult.snapshotResult,
       buildTime: totalTime,
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
-      create_release: context.eventName == 'push' && (inputs.create_release || false)
+      create_release:
+        context.eventName == "push" && (inputs.create_release || false),
     };
 
     const response = await ky.post(
