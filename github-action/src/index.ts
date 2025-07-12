@@ -133,7 +133,7 @@ async function run(): Promise<void> {
     };
 
     const response = await ky.post(
-      `${inputs.deployServerUrl}/process`,
+      `${inputs.deployServerUrl}/api/process`,
       {
         json: deploymentRequest,
         timeout: 60000,
