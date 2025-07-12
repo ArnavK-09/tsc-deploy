@@ -16,8 +16,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "useDefineForClassFields": true,
-    "outDir": "./dist",
-    "rootDir": "."
-  },
-  "exclude": ["node_modules", "dist", "build", "sample-board"]
+    "types": ["bun-types"]
+  }
 }

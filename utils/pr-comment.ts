@@ -1,4 +1,4 @@
-import { SnapshotResult } from "@tscircuit-deploy/shared/types";
+import { SnapshotResult } from "../types";
 
 export function createDeploymentTable(data: {
   deploymentId: string;

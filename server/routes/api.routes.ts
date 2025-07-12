@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { DeploymentRequestSchema } from "@tscircuit-deploy/shared/types";
-import { db, deployments } from "@tscircuit-deploy/shared/db";
-import { GitHubService } from "@tscircuit-deploy/shared/services";
+import { DeploymentRequestSchema } from "../../types";
+import { db, deployments } from "../../db";
 import { botOctokit } from "..";
-import { DEPLOY_URL } from "@tscircuit-deploy/shared/constants";
-import { generatePRComment } from "../utils/pr-comment";
+import { DEPLOY_URL } from "../../shared/constants";
+import { generatePRComment } from "../../utils/pr-comment";
+import { GitHubService } from "../../shared/github.service";
 
 const router = new Hono();
 

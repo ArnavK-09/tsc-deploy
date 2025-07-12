@@ -24,14 +24,13 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Build tscircuit
-        working-directory: ./packages/github-action
+      - name: Build tscircuit action
         run: |
           bun install
-          bun x tsup ./src/index.ts --format esm
+          bun x tsup ./github-action/src/index.ts --format esm
 
       - name: Deploy tscircuit
-        uses: ./packages/github-action
+        uses: ./github-action
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: "."

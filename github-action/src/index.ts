@@ -2,17 +2,11 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { z } from "zod";
 import snapshotProject, { findCircuitFiles } from "./snapshot-project";
-import {
-  DEPLOY_URL,
-  DEPLOY_SERVER_URL,
-} from "@tscircuit-deploy/shared/constants";
+import { DEPLOY_URL, DEPLOY_SERVER_URL } from "../../shared/constants";
 import { ulid } from "ulid";
 import ky from "ky";
-import {
-  DeploymentRequest,
-  SnapshotResult,
-} from "@tscircuit-deploy/shared/types";
-import { GitHubService } from "@tscircuit-deploy/shared/services";
+import { DeploymentRequest, SnapshotResult } from "../../shared/types";
+import { GitHubService } from "../../shared/github.service";
 
 const InputSchema = z.object({
   githubToken: z.string(),

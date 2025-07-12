@@ -9,7 +9,7 @@ import {
 import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d";
 import { CircuitRunner } from "tscircuit";
 import { relative } from "node:path";
-import { SnapshotResult } from "@tscircuit-deploy/shared/types";
+import { SnapshotResult } from "../../shared/types";
 
 const ALLOWED_FILE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
 

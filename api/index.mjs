@@ -8,7 +8,7 @@ import { handle } from "hono/vercel";
  * Import the 'app' instance from the server source.
  * This instance represents the application logic and routes.
  */
-import { app } from "../apps/server/src/index.js";
+import { app } from "../src/index.js";
 
 /**
  * Create a request handler using the 'handle' function.
