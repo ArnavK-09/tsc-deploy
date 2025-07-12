@@ -129,8 +129,11 @@ async function run(): Promise<void> {
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
       create_release:
-        context.eventName == "push" && (inputs.create_release || false),
+      context.eventName == "push" && (inputs.create_release || false),
     };
+    console.log({
+      Authorization: `Bearer ${inputs.githubToken}`,
+    })
 
     const response = await ky.post(
       `${inputs.deployServerUrl}/api/process`,
@@ -147,10 +150,7 @@ async function run(): Promise<void> {
       },
     );
 
-    console.log({
-      Authorization: `Bearer ${inputs.githubToken}`,
-    })
-
+    
     const result = await response.json<{
       success: boolean;
       previewUrl?: string;
