@@ -4,9 +4,7 @@ async function verifyGitHubToken(token: string): Promise<boolean> {
   try {
     const response = await fetch("https://api.github.com/user", {
       headers: {
-        Authorization: `Bearer ${token}`,
-        "User-Agent": "tscircuit-deploy-bot",
-        "X-GitHub-Api-Version": "2022-11-28",
+        Authorization: `Bearer ${token}`
       },
     });
 
