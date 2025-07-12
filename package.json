@@ -5,9 +5,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target node",
-    "start": "bun src/index.ts",
+    "dev": "bun --hot server/index.ts",
+    "build": "bun build server/index.ts --outdir dist --target node",
+    "start": "bun server/index.ts",
     "test": "bun test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "check": "tsc --noEmit",
