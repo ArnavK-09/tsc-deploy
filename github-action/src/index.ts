@@ -147,6 +147,10 @@ async function run(): Promise<void> {
       },
     );
 
+    console.log({
+      Authorization: `Bearer ${inputs.githubToken}`,
+    })
+
     const result = await response.json<{
       success: boolean;
       previewUrl?: string;
