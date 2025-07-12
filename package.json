@@ -30,10 +30,10 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "prettier": "^3.6.0",
-    "typescript": "5.8.2",
+    "@types/bun": "^1.2.18",
     "@types/node": "^20.11.0",
-    "@types/bun": "^1.2.18"
+    "prettier": "^3.6.0",
+    "typescript": "^5.8.3"
   },
   "engines": {
     "bun": ">=1.2.15"
