@@ -30,7 +30,7 @@ jobs:
           bun tsup ./github-action/src/index.ts --format esm
 
       - name: Deploy tscircuit
-        uses: ./dist/index.js
+        uses: ./github-action
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: "."
