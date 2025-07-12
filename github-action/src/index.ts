@@ -146,10 +146,14 @@ async function run(): Promise<void> {
         },
         headers: {
           Authorization: `Bearer ${inputs.githubToken}`,
-        },
+        },throwHttpErrors: false
       },
     );
 
+    if(!response.ok) {
+      console.log(response)
+      throw new Error(response.statusText);
+    }
     
     const result = await response.json<{
       success: boolean;
