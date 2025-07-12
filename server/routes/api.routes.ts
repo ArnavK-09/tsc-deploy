@@ -16,7 +16,7 @@ router.get("/deployments", async (c) => {
   });
 });
 
-router.post("/process", async (c) => {
+router.all("/process", async (c) => {
   const body = await c.req.json();
   const deploymentRequest = DeploymentRequestSchema.parse(body);
   const userOctokit = new GitHubService({
