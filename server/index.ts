@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { env } from "../shared/constants";
 import { GitHubService } from "../shared/github.service";
 import { apiAuth } from "./middleware/github-token-expected";
 import apiRouter from "./routes/api.routes";
+import { env } from "../shared/env";
 
 const port = 3000;
 export const app = new Hono();

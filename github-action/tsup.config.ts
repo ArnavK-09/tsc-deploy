@@ -44,4 +44,4 @@ export default defineConfig({
   sourcemap: false,
   bundle: true,
   splitting: false,
-}); 
+});
