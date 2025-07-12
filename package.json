@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun --hot server/index.ts",
     "build": "bun build server/index.ts --outdir dist --target node",
-    "build:action": "bun tsup ./github-action/src/index.ts --format esm --out-dir github-action/dist",
+    "build:action": "bun tsup ./github-action/src/index.ts --format cjs --out-dir github-action/dist --platform node",
     "start": "bun server/index.ts",
     "test": "bun test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",

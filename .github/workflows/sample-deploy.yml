@@ -27,7 +27,7 @@ jobs:
       - name: Build tscircuit action
         run: |
           bun install
-          bun tsup ./github-action/src/index.ts --format esm --out-dir github-action/dist
+          bun tsup ./github-action/src/index.ts --format cjs --out-dir github-action/dist --platform node
 
       - name: Deploy tscircuit
         uses: ./github-action
