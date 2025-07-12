@@ -6,6 +6,11 @@ export default defineConfig({
   outDir: "dist",
   platform: "node",
   target: "node20",
+  outExtension({ format }) {
+    return {
+      js: format === "cjs" ? ".cjs" : ".js",
+    };
+  },
   external: [
     // Node.js built-ins
     "string_decoder",
