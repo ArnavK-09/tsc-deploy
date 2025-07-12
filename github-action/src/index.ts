@@ -152,6 +152,7 @@ async function run(): Promise<void> {
 
     if(!response.ok) {
       console.log(response)
+      console.log(await response.text())
       throw new Error(response.statusText);
     }
     
