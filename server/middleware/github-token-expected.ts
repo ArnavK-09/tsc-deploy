@@ -19,7 +19,7 @@ export async function expectedGithubToken(c: Context, next: Next) {
   const authHeader = c.req.header("Authorization");
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ error: "Unauthorized - Bearer token required" }, 401);
+    return c.json({ error: "Unauthorized - Bearer token required" }, 400);
   }
 
   const token = authHeader.substring(7);
