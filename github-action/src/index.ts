@@ -131,19 +131,16 @@ async function run(): Promise<void> {
       create_release:
       context.eventName == "push" && (inputs.create_release || false),
     };
-    console.log({
-      Authorization: `Bearer ${inputs.githubToken}`,
-    })
 
     const response = await ky.post(
       `${inputs.deployServerUrl}/api/process`,
       {
         json: deploymentRequest,
-        timeout: 60000,
-        retry: {
-          limit: 3,
-          methods: ["post"],
-        },
+        // timeout: 60000,
+        // retry: {
+        //   limit: 3,
+        //   methods: ["post"],
+        // },
         headers: {
           Authorization: `Bearer ${inputs.githubToken}`,
         },throwHttpErrors: false
@@ -156,11 +153,7 @@ async function run(): Promise<void> {
       throw new Error(response.statusText);
     }
     
-    const result = await response.json<{
-      success: boolean;
-      previewUrl?: string;
-      error?: string;
-    }>();
+    const result = await response.json<any>();
 
     if (!result.success) {
       throw new Error(result.error || "Deployment processing failed");
@@ -188,7 +181,7 @@ async function run(): Promise<void> {
   } catch (error) {
     const errorMessage =
     error instanceof Error ? error.message : "Unknown error";
-    core.error(error)
+    core.error(error as Error)
     core.setFailed(`☠️ Workflow failed: ${errorMessage}`);
     process.exit(1);
   }
