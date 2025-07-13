@@ -13,7 +13,7 @@ export const botOctokit = new GitHubService({
   token: env.GITHUB_BOT_TOKEN,
 });
 
-app.use("*", cors());
+app.use("*", cors({ origin: "*" }));
 app.use("*", logger());
 
 app.get("/", (c) => {
