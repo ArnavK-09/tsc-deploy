@@ -26,18 +26,28 @@ export interface DeploymentResult {
 
 async function run(): Promise<void> {
   try {
+    core.info("🔍 Parsing inputs...");
     const inputs = InputSchema.parse({
       githubToken: core.getInput("github-token"),
       workingDirectory: core.getInput("working-directory"),
       deployServerUrl: core.getInput("deploy-server-url") || DEPLOY_SERVER_URL,
       create_release: core.getInput("create-release") === "true",
     });
+    core.info("✅ Inputs parsed successfully.");
 
+    core.info("🔍 Retrieving GitHub context...");
     const context = github.context;
+    core.info("✅ GitHub context retrieved.");
+
+    core.info("🔍 Initializing GitHub service...");
     const userOctokit = new GitHubService({
       token: inputs.githubToken,
     });
+    core.info("✅ GitHub service initialized.");
+
+    core.info("🔍 Generating unique deployment ID...");
     const ID = ulid();
+    core.info(`✅ Deployment ID generated: ${ID}`);
 
     core.info(`\n🔌 Starting tscircuit Deploy`);
     core.info(`\tRepository: ${context.repo.owner}/${context.repo.repo}`);
@@ -45,19 +55,26 @@ async function run(): Promise<void> {
     core.info(`\tSHA: ${context.sha}`);
 
     const startTime = Date.now();
+    core.info("⏱️ Start time recorded.");
 
+    core.info("🔍 Finding circuit files...");
     const circuitFiles = await findCircuitFiles(inputs.workingDirectory);
+    core.info(`✅ Found ${circuitFiles.length} circuit file(s).`);
 
     if (circuitFiles.length === 0) {
       core.warning("⚠️ No circuit files found");
       core.setOutput("deployment-id", "no-circuits");
       core.setOutput("circuit-count", "0");
       core.setOutput("status", "skipped");
+      core.info("🚫 Deployment skipped due to no circuit files.");
       return;
     }
 
     core.info(`📋 Found ${circuitFiles.length} circuit file(s), Building...\n`);
     const buildResult = await runTscircuitBuild(inputs, circuitFiles);
+    core.info("✅ Build completed.");
+
+    core.info("🔍 Creating deployment...");
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
       repo: context.repo.repo,
@@ -79,9 +96,11 @@ async function run(): Promise<void> {
         circuitCount: buildResult.snapshotResult.circuitFiles.length,
       },
     });
+    core.info(`✅ Deployment created with ID: ${deploymentId}`);
 
     let checkRunId: number | undefined;
     if (context.eventName == "pull_request") {
+      core.info("🔍 Creating check run for pull request...");
       const { checkRunId: checkRunIdCreated } =
         await userOctokit.createCheckRun({
           owner: context.repo.owner,
@@ -95,12 +114,14 @@ async function run(): Promise<void> {
             summary: `Found ${buildResult.snapshotResult.circuitFiles.length} circuit file${buildResult.snapshotResult.circuitFiles.length === 1 ? "" : "s"}. Starting build...`,
           },
         });
-
       checkRunId = checkRunIdCreated;
+      core.info(`✅ Check run created with ID: ${checkRunId}`);
     }
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
+    core.info(`⏱️ Total build time: ${totalTime}s`);
 
+    core.info("🔍 Preparing deployment request...");
     const deploymentRequest: DeploymentRequest = {
       id: ID,
       owner: context.repo.owner,
@@ -131,35 +152,39 @@ async function run(): Promise<void> {
       create_release:
       context.eventName == "push" && (inputs.create_release || false),
     };
+    core.info("✅ Deployment request prepared.");
 
+    core.info("🔍 Sending deployment request...");
     const response = await ky.post(
       `${inputs.deployServerUrl}/api/process`,
       {
         json: deploymentRequest,
-        // timeout: 60000,
-        // retry: {
-        //   limit: 3,
-        //   methods: ["post"],
-        // },
         headers: {
           Authorization: `Bearer ${inputs.githubToken}`,
-        },throwHttpErrors: false
+        },
+        throwHttpErrors: false
       },
     );
+    core.info("✅ Deployment request sent.");
 
-    if(!response.ok) {
-      console.log(response)
-      console.log(await response.text())
+    if(!response.ok) {  
+      core.error("❌ Deployment request failed.");
+      console.log(response);
+      console.log(await response.text());
       throw new Error(response.statusText);
     }
     
+    core.info("🔍 Parsing deployment response...");
     const result = await response.json<any>();
+    core.info("✅ Deployment response parsed.");
 
     if (!result.success) {
+      core.error("❌ Deployment processing failed.");
       throw new Error(result.error || "Deployment processing failed");
     }
 
     const previewUrl = result.previewUrl;
+    core.info("✅ Deployment processed successfully.");
 
     core.setOutput("deployment-id", deploymentId);
     core.setOutput("build-time", totalTime.toString());
@@ -181,7 +206,7 @@ async function run(): Promise<void> {
   } catch (error) {
     const errorMessage =
     error instanceof Error ? error.message : "Unknown error";
-    core.error(error as Error)
+    core.error(error as Error);
     core.setFailed(`☠️ Workflow failed: ${errorMessage}`);
     process.exit(1);
   }
@@ -192,6 +217,7 @@ async function runTscircuitBuild(
   circuitFiles: string[],
 ): Promise<{ buildTime: number; snapshotResult: SnapshotResult }> {
   const startTime = Date.now();
+  core.info("⏱️ Build start time recorded.");
 
   core.info("🔨 Running tscircuit build and snapshot generation...");
   core.info(
@@ -199,9 +225,12 @@ async function runTscircuitBuild(
   );
 
   try {
+    core.info("🔍 Generating snapshot...");
     const snapshotResult = await snapshotProject(inputs.workingDirectory);
+    core.info("✅ Snapshot generated.");
 
     if (!snapshotResult.success) {
+      core.error("❌ Snapshot generation failed.");
       throw new Error(
         `Snapshot generation failed: ${snapshotResult.error || "Unknown error"}`,
       );
@@ -214,6 +243,7 @@ async function runTscircuitBuild(
     core.info(`   • Build time: ${snapshotResult.buildTime}s`);
 
     const buildTime = Math.round((Date.now() - startTime) / 1000);
+    core.info(`⏱️ Build time: ${buildTime}s`);
 
     return { buildTime, snapshotResult };
   } catch (error) {
