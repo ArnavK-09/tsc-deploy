@@ -157,7 +157,7 @@ async function run(): Promise<void> {
       `${inputs.deployServerUrl}/api/process`,
       {
         method: 'POST',
-        body: JSON.stringify(deploymentRequest),
+        body: JSON.stringify({}),
         headers: {
           Authorization: `Bearer ${inputs.githubToken}`,
           'Content-Type': 'application/json',
