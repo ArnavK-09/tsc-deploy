@@ -153,6 +153,7 @@ async function run(): Promise<void> {
       context.eventName == "push" && (inputs.create_release || false),
     };
     core.info("✅ Deployment request prepared.");
+    core.info(JSON.stringify(deploymentRequest, null, 2));
     const response2 = await ky.post(
       `${inputs.deployServerUrl}/api/process`,
       {
@@ -162,7 +163,7 @@ async function run(): Promise<void> {
         }
       },
     );
-    console.log(69, await response2.json());
+    core.info(await response2.json());
     const response = await fetch(
       `${inputs.deployServerUrl}/api/process`,
       {
@@ -188,7 +189,7 @@ async function run(): Promise<void> {
     }
     
     core.info("🔍 Parsing deployment response...");
-    const result = await response.json<any>();
+    const result = await response.json() as any;
     core.info("✅ Deployment response parsed.");
 
     if (!result.success) {
