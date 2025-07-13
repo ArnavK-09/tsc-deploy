@@ -188,6 +188,7 @@ async function run(): Promise<void> {
   } catch (error) {
     const errorMessage =
     error instanceof Error ? error.message : "Unknown error";
+    core.error(error)
     core.setFailed(`☠️ Workflow failed: ${errorMessage}`);
     process.exit(1);
   }
