@@ -166,6 +166,7 @@ async function run(): Promise<void> {
     );
     core.info(await response2.text());
     core.info("Mock sent")
+    process.exit(1);
     const response = await ky.post(
       `${inputs.deployServerUrl}/api/process`,
       {
