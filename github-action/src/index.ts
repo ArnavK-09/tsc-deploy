@@ -153,18 +153,7 @@ async function run(): Promise<void> {
       context.eventName == "push" && (inputs.create_release || false),
     };
     core.info("✅ Deployment request prepared.");
-    core.info(JSON.stringify(deploymentRequest, null, 2));
-    const response2 = await ky.post(
-      `${inputs.deployServerUrl}/api/process`,
-      {
-        body: JSON.stringify(deploymentRequest),
-        headers: {
-          Authorization: `Bearer ${inputs.githubToken}`,
-        }
-      },
-    );
-    core.info(await response2.json());
-    const response = await fetch(
+    const response2 = await fetch(
       `${inputs.deployServerUrl}/api/process`,
       {
         method: 'POST',
@@ -175,7 +164,17 @@ async function run(): Promise<void> {
         },
       }
     );
+    core.info(await response2.text());
 
+    const response = await ky.post(
+      `${inputs.deployServerUrl}/api/process`,
+      {
+        body: JSON.stringify(deploymentRequest),
+        headers: {
+          Authorization: `Bearer ${inputs.githubToken}`,
+        }
+      },
+    );
 
 
     core.info("🔍 Sending deployment request...");
