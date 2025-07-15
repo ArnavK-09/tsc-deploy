@@ -4,8 +4,8 @@ import { GitHubService } from "../../../../shared/github.service";
 import { DEPLOY_URL } from "../../../../shared/constants";
 import { generatePRComment } from "../../../../utils/pr-comment";
 import { env } from "../../../../shared/env";
-import { validateGitHubToken } from "@/utils/auth";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
+import { extractGitHubToken } from "@/utils/auth";
 
 const botOctokit = new GitHubService({
   token: env.GITHUB_BOT_TOKEN,
@@ -13,10 +13,12 @@ const botOctokit = new GitHubService({
 
 export async function POST(context: { request: Request }) {
   const request = context.request;
+  const token = extractGitHubToken(request);
 
-  const authResult = await validateGitHubToken(request);
-  if (!authResult.success) {
-    return createErrorResponse(authResult.error!, 401);
+  if (!token) {
+    return createSuccessResponse({
+      wow: "wow",
+    });
   }
 
   try {
@@ -24,7 +26,7 @@ export async function POST(context: { request: Request }) {
     const deploymentRequest = DeploymentRequestSchema.parse(body);
 
     const userOctokit = new GitHubService({
-      token: authResult.token!,
+      token: token,
     });
 
     const ID = deploymentRequest.id;
