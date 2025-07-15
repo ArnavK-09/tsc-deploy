@@ -27,4 +27,4 @@ export const PUT = handler;
 export const OPTIONS = handler; 
 
 
-export const runtime = 'edge'
+export const runtime = 'edge';
