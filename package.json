@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot server/index.ts",
-    "build": "bun build server/index.ts --outdir dist --target node",
+    "build": "cd app && bun x astro build",
     "build:action": "cd github-action && bun tsup",
     "start": "bun server/index.ts",
     "test": "bun test",
