@@ -161,8 +161,10 @@ async function run(): Promise<void> {
       headers: {
         Authorization: `Bearer ${inputs.githubToken}`,
       },
+      throwHttpErrors: false
     });
-
+console.log(response)
+process.exit(0)
     core.info("🔍 Sending deployment request...");
     core.info("✅ Deployment request sent.");
 
