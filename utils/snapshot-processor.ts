@@ -300,13 +300,28 @@ export class SnapshotProcessor {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      this.updateProgress(
-        "error",
-        0,
-        `Snapshot generation failed: ${errorMessage}`,
-      );
-      result.error = errorMessage;
-      result.buildTime = Math.round((Date.now() - startTime) / 1000);
+      const isNonRetryable = 
+        errorMessage.includes("404 Not Found") ||
+        errorMessage.includes("403 Forbidden") ||
+        errorMessage.includes("repository may be private") ||
+        errorMessage.includes("Archive URL may be invalid");
+
+      if (isNonRetryable) {
+        this.updateProgress(
+          "error",
+          0,
+          `Snapshot generation failed: ${errorMessage}`,
+        );
+        result.error = errorMessage;
+        result.buildTime = Math.round((Date.now() - startTime) / 1000);
+        return result;
+      }
+
+      // If it's a retryable error, we'll let the retry mechanism handle it
+      // The retry mechanism will call this function again with the same file
+      // and potentially a different error if it's still not successful.
+      // For now, we'll just return the result as is, and the retry mechanism
+      // will decide if it should be retried or marked as failed.
       return result;
     }
   }

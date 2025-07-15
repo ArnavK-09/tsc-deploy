@@ -174,6 +174,13 @@ export class JobQueue {
         error instanceof Error ? error.message : "Unknown error";
       console.error(`Job ${job.id} failed:`, error);
 
+      // Check if this is a non-retryable error
+      const isNonRetryable = 
+        errorMessage.includes("404 Not Found") ||
+        errorMessage.includes("403 Forbidden") ||
+        errorMessage.includes("repository may be private") ||
+        errorMessage.includes("Archive URL may be invalid");
+
       await db
         .update(buildJobs)
         .set({
@@ -184,19 +191,31 @@ export class JobQueue {
         })
         .where(eq(buildJobs.id, job.id));
 
-      if (job.retryCount < job.maxRetries) {
+      if (!isNonRetryable && job.retryCount < job.maxRetries) {
         console.log(
           `Retrying job ${job.id} (attempt ${job.retryCount + 1}/${job.maxRetries})`,
         );
-        await db
-          .update(buildJobs)
-          .set({
-            status: "queued",
-            startedAt: null,
-            completedAt: null,
-          })
-          .where(eq(buildJobs.id, job.id));
+        
+        // Add exponential backoff delay for retries
+        const delayMs = Math.min(1000 * Math.pow(2, job.retryCount), 30000); // Max 30 seconds
+        console.log(`Retrying job ${job.id} in ${delayMs}ms`);
+        
+        setTimeout(async () => {
+          await db
+            .update(buildJobs)
+            .set({
+              status: "queued",
+              startedAt: null,
+              completedAt: null,
+            })
+            .where(eq(buildJobs.id, job.id));
+        }, delayMs);
       } else {
+        if (isNonRetryable) {
+          console.log(`Job ${job.id} failed with non-retryable error: ${errorMessage}`);
+        } else {
+          console.log(`Job ${job.id} failed after ${job.maxRetries} retries`);
+        }
         await this.handleJobFailure(job, jobData, errorMessage);
       }
     } finally {
