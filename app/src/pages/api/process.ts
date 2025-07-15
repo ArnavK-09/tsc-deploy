@@ -6,10 +6,8 @@ import { generatePRComment } from "@/utils/pr-comment";
 import { env } from "@/utils/env";
 import {
   validateGitHubToken,
-  createSuccessResponse,
-  createErrorResponse,
-  extractGitHubToken,
 } from "@/utils/auth";
+import { createErrorResponse , createSuccessResponse} from "@/utils/http";
 
 const botOctokit = new GitHubService({
   token: env.GITHUB_BOT_TOKEN,

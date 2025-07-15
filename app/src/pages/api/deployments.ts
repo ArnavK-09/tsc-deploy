@@ -1,5 +1,5 @@
 import { db, deployments } from "@/utils/db";
-import { createSuccessResponse, createErrorResponse } from "@/utils/auth";
+import { createSuccessResponse, createErrorResponse } from "@/utils/http";
 
 export async function GET() {
   try {

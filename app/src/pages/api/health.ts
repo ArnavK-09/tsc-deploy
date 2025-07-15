@@ -1,4 +1,4 @@
-import { createSuccessResponse } from "@/utils/auth";
+import { createSuccessResponse } from "@/utils/http";
 
 export async function GET() {
   return createSuccessResponse({

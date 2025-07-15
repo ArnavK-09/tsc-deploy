@@ -153,22 +153,9 @@ async function run(): Promise<void> {
         context.eventName == "push" && (inputs.create_release || false),
     };
     core.info("✅ Deployment request prepared");
-    const response4 = await fetch("https://example.com");
+    const response4 = await fetch(`${inputs.deployServerUrl}/api/health`);
     console.log(await response4.text());
     console.log("deploymentRequest");
-    const response2 = await fetch(`${inputs.deployServerUrl}/api/process`, {
-      method: "POST",
-      body: JSON.stringify({}),
-      headers: {
-        Authorization: `Bearer ${inputs.githubToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-    core.info(
-      (await response2.text()) + `${inputs.deployServerUrl}/api/process`,
-    );
-    core.info("Mock sent");
-    process.exit(1);
     const response = await ky.post(`${inputs.deployServerUrl}/api/process`, {
       body: JSON.stringify(deploymentRequest),
       headers: {
