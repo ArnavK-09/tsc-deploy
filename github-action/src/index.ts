@@ -57,15 +57,15 @@ async function run(): Promise<void> {
     core.info("⏱️ Start time recorded.");
 
     // Validate that this is a supported event
-    if (!["push", "pull_request"].includes(context.eventName)) {
-      core.warning(`⚠️ Unsupported event type: ${context.eventName}`);
+    const EVENT_TYPE = context.eventName == "workflow_dispatch" ? "push" : context.eventName;
+    if (!["push", "pull_request"].includes(EVENT_TYPE)) {
+      core.warning(`⚠️ Unsupported event type: ${EVENT_TYPE}`);
       core.setOutput("status", "skipped");
       return;
     }
 
     core.info("🔍 Creating deployment...");
 
-    const EVENT_TYPE = context.eventName == "workflow_dispatch" ? "push" : context.eventName;
 
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
