@@ -31,7 +31,7 @@ app.get("/health", (c) => {
   });
 });
 
-app.use("/*", apiAuth);
+// app.use("/*", apiAuth);
 app.route("/", apiRouter);
 
 app.notFound((c) => {
