@@ -299,9 +299,11 @@ async function waitForBuildCompletion(
         }
       } else {
         core.warning(`Failed to check build status: ${response.status}`);
+        throw new Error(`Build failed: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       core.warning(`Failed to check build status: ${error}`);
+      throw new Error(`Build failed: ${error}`);
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
