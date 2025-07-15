@@ -65,26 +65,24 @@ async function run(): Promise<void> {
 
     core.info("🔍 Creating deployment...");
 
-    if(context.eventName == "workflow_dispatch") {
-      context.eventName = 'push'
-    }
+    const EVENT_TYPE = context.eventName == "workflow_dispatch" ? "push" : context.eventName;
 
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
       repo: context.repo.repo,
       ref: context.sha,
       environment:
-        context.eventName === "push"
+        EVENT_TYPE === "push"
           ? context.ref === "refs/heads/main" ||
             context.ref === "refs/heads/master"
             ? "production"
             : "staging"
           : "preview",
-      description: `Deploy to ${context.eventName === "push" ? (context.ref === "refs/heads/main" || context.ref === "refs/heads/master" ? "production" : "staging") : "preview"} from ${context.sha}`,
+      description: `Deploy to ${EVENT_TYPE === "push" ? (context.ref === "refs/heads/main" || context.ref === "refs/heads/master" ? "production" : "staging") : "preview"} from ${context.sha}`,
       payload: {
         deploymentId: `deployment-${ID}`,
         pullRequestNumber:
-          context.eventName === "pull_request"
+          EVENT_TYPE === "pull_request"
             ? context.payload.pull_request?.number?.toString() || ""
             : context.sha,
       },
@@ -92,7 +90,7 @@ async function run(): Promise<void> {
     core.info(`✅ Deployment created with ID: ${deploymentId}`);
 
     let checkRunId: number | undefined;
-    if (context.eventName === "pull_request") {
+    if (EVENT_TYPE === "pull_request") {
       core.info("🔍 Creating check run for pull request...");
       const { checkRunId: checkRunIdCreated } =
         await userOctokit.createCheckRun({
@@ -122,15 +120,15 @@ async function run(): Promise<void> {
       repo: context.repo.repo,
       ref: context.sha,
       environment:
-        context.eventName === "push"
+        EVENT_TYPE === "push"
           ? context.ref === "refs/heads/main" ||
             context.ref === "refs/heads/master"
             ? "production"
             : "staging"
           : "preview",
-      eventType: context.eventName,
+      eventType: EVENT_TYPE,
       meta:
-        context.eventName === "pull_request"
+        EVENT_TYPE === "pull_request"
           ? context.payload.pull_request?.number?.toString() || ""
           : context.sha,
       context: {
@@ -142,7 +140,7 @@ async function run(): Promise<void> {
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
       create_release:
-        context.eventName === "push" && (inputs.create_release || false),
+        EVENT_TYPE === "push" && (inputs.create_release || false),
       repoArchiveUrl,
     };
     core.info("✅ Build request prepared");
