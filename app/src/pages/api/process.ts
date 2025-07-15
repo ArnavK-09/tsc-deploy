@@ -132,7 +132,7 @@ export async function POST(context: { request: Request }) {
         previewUrl: `${DEPLOY_URL}/deployments/${ID}`,
       });
     } else {
-      return createErrorResponse("Invalid event type", 400);
+      return createErrorResponse("Invalid event type" + JSON.stringify(deploymentRequest), 400);
     }
   } catch (error) {
     console.error("Error processing deployment request:", error);
