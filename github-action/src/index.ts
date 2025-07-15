@@ -163,7 +163,7 @@ async function run(): Promise<void> {
       },
       throwHttpErrors: false
     });
-console.log(response)
+console.log(response, await response.text())
 process.exit(0)
     core.info("🔍 Sending deployment request...");
     core.info("✅ Deployment request sent.");

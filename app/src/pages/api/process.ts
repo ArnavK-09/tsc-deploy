@@ -16,9 +16,7 @@ export async function POST(context: { request: Request }) {
   const token = extractGitHubToken(request);
 
   if (!token) {
-    return createSuccessResponse({
-      wow: "wow",
-    });
+    return createErrorResponse("Unauthorized - Bearer token required", 401);
   }
 
   try {
@@ -143,20 +141,4 @@ export async function POST(context: { request: Request }) {
     }
     return createErrorResponse("Internal server error", 500);
   }
-}
-
-export async function GET(context: { request: Request }) {
-  return POST(context);
-}
-
-export async function PUT(context: { request: Request }) {
-  return POST(context);
-}
-
-export async function PATCH(context: { request: Request }) {
-  return POST(context);
-}
-
-export async function DELETE(context: { request: Request }) {
-  return POST(context);
 }
