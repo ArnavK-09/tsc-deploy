@@ -301,7 +301,7 @@ async function waitForBuildCompletion(
         throw new Error(`Build failed: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      core.warning(`Failed to verify build status: ${error}`);
+      throw new Error(`Build failed: ${error}`);
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
