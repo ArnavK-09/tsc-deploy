@@ -194,53 +194,102 @@ export class JobQueue {
   private async downloadRepository(jobData: BuildJobData): Promise<string> {
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const { FileHandler } = await import("./file-handler");
-    
-    const execAsync = promisify(exec);
     const workDir = path.join("/tmp", `build-${jobData.deploymentId}`);
     
     fs.mkdirSync(workDir, { recursive: true });
 
+    // On Vercel, prioritize archive download since git may not be available
     if (jobData.repoArchiveUrl) {
       try {
-        const archivePath = path.join("/tmp", `archive-${jobData.deploymentId}.tar.gz`);
-        
-        const downloadCommand = `curl -L -H "Authorization: token ${jobData.githubToken}" "${jobData.repoArchiveUrl}" -o "${archivePath}"`;
-        await execAsync(downloadCommand);
-        
-        const isValidSize = await FileHandler.validateFileSize(archivePath);
-        if (!isValidSize) {
-          throw new Error("Repository archive exceeds maximum file size limit");
-        }
-        
-        await FileHandler.extractArchive(archivePath, workDir);
-        
-        const extractedDirs = fs.readdirSync(workDir);
-        if (extractedDirs.length === 1) {
-          const extractedDir = path.join(workDir, extractedDirs[0]);
-          const tempDir = path.join("/tmp", `temp-${jobData.deploymentId}`);
-          fs.renameSync(extractedDir, tempDir);
-          fs.rmSync(workDir, { recursive: true });
-          fs.renameSync(tempDir, workDir);
-        }
-        
-        await FileHandler.cleanup([archivePath]);
+        await this.downloadAndExtractArchive(jobData, workDir);
+        return workDir;
       } catch (error) {
-        console.warn("Archive download failed, falling back to git clone:", error);
-        const cloneUrl = `https://x-access-token:${jobData.githubToken}@github.com/${jobData.owner}/${jobData.repo}.git`;
-        await execAsync(`git clone ${cloneUrl} .`, { cwd: workDir });
-        await execAsync(`git checkout ${jobData.ref}`, { cwd: workDir });
+        console.warn("Archive download failed:", error);
+        
+        // If archive fails, try alternative methods
+        try {
+          await this.downloadWithFetch(jobData, workDir);
+          return workDir;
+        } catch (fetchError) {
+          console.warn("Fetch download failed:", fetchError);
+          throw new Error(`Failed to download repository: ${error}. Archive URL may be invalid or repository may be private.`);
+        }
       }
     } else {
-      const cloneUrl = `https://x-access-token:${jobData.githubToken}@github.com/${jobData.owner}/${jobData.repo}.git`;
-      await execAsync(`git clone ${cloneUrl} .`, { cwd: workDir });
-      await execAsync(`git checkout ${jobData.ref}`, { cwd: workDir });
+      // Fallback: try to use Node.js fetch for public repos
+      try {
+        await this.downloadWithFetch(jobData, workDir);
+        return workDir;
+      } catch (error) {
+        throw new Error(`No archive URL provided and fetch failed: ${error}. Please ensure the repository is accessible.`);
+      }
     }
-
-    return workDir;
   }
+
+  private async downloadAndExtractArchive(jobData: BuildJobData, workDir: string): Promise<void> {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { FileHandler } = await import("./file-handler");
+    
+    const archivePath = path.join("/tmp", `archive-${jobData.deploymentId}.tar.gz`);
+    
+    // Use Node.js fetch instead of curl for better Vercel compatibility
+    const response = await fetch(jobData.repoArchiveUrl!, {
+      headers: {
+        'Authorization': `token ${jobData.githubToken}`,
+        'User-Agent': 'tscircuit-deploy/1.0.0',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download archive: ${response.status} ${response.statusText}`);
+    }
+    
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(archivePath, Buffer.from(buffer));
+    
+    const isValidSize = await FileHandler.validateFileSize(archivePath);
+    if (!isValidSize) {
+      throw new Error("Repository archive exceeds maximum file size limit");
+    }
+    
+    await FileHandler.extractArchive(archivePath, workDir);
+    
+    // Handle GitHub archive structure (removes the top-level directory)
+    const extractedDirs = fs.readdirSync(workDir);
+    if (extractedDirs.length === 1) {
+      const extractedDir = path.join(workDir, extractedDirs[0]);
+      const tempDir = path.join("/tmp", `temp-${jobData.deploymentId}`);
+      fs.renameSync(extractedDir, tempDir);
+      fs.rmSync(workDir, { recursive: true });
+      fs.renameSync(tempDir, workDir);
+    }
+    
+    await FileHandler.cleanup([archivePath]);
+  }
+
+  private async downloadWithFetch(jobData: BuildJobData, workDir: string): Promise<void> {
+    // This is a simpler fallback that downloads the archive directly
+    const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/archive/${jobData.ref}.tar.gz`;
+    
+    const response = await fetch(archiveUrl, {
+      headers: {
+        'Authorization': `token ${jobData.githubToken}`,
+        'User-Agent': 'tscircuit-deploy/1.0.0',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download repository: ${response.status} ${response.statusText}`);
+    }
+    
+    await this.downloadAndExtractArchive({
+      ...jobData,
+      repoArchiveUrl: archiveUrl,
+    }, workDir);
+  }
+
+
 
   private async buildProject(jobId: string, workingDirectory: string) {
     const processor = new SnapshotProcessor(
@@ -396,8 +445,9 @@ export class JobQueue {
       owner: jobData.owner,
       repo: jobData.repo,
       deploymentId: jobData.deploymentId_github,
-      state: "error",
+      state: "failure",
       description: `Build failed: ${errorMessage}`,
+      logUrl: `${jobData.context.serverUrl}/${jobData.owner}/${jobData.repo}/actions/runs/${jobData.context.runId}`,
     });
 
     // Post failure comment to PR

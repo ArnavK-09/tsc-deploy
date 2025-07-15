@@ -136,23 +136,56 @@ export class FileHandler {
   }
 
   static async compressDirectory(dirPath: string, outputPath: string): Promise<void> {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
+    try {
+      // Try using Node.js tar package if available
+      const tar = await import("tar").catch(() => null);
+      
+      if (tar) {
+        await tar.create({
+          file: outputPath,
+          gzip: true,
+          cwd: path.dirname(dirPath),
+        }, [path.basename(dirPath)]);
+      } else {
+        // Fallback to shell command
+        const { exec } = await import("node:child_process");
+        const { promisify } = await import("node:util");
+        const execAsync = promisify(exec);
 
-    const tarCommand = `tar -czf "${outputPath}" -C "${path.dirname(dirPath)}" "${path.basename(dirPath)}"`;
-    await execAsync(tarCommand);
+        const tarCommand = `tar -czf "${outputPath}" -C "${path.dirname(dirPath)}" "${path.basename(dirPath)}"`;
+        await execAsync(tarCommand);
+      }
+    } catch (error) {
+      throw new Error(`Failed to compress directory: ${error}`);
+    }
   }
 
   static async extractArchive(archivePath: string, outputDir: string): Promise<void> {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
+    try {
+      // Try using Node.js built-in tar extraction if available
+      const tar = await import("tar").catch(() => null);
+      
+      if (tar) {
+        // Use tar package for extraction
+        await tar.extract({
+          file: archivePath,
+          cwd: outputDir,
+          strip: 0,
+        });
+      } else {
+        // Fallback to shell command
+        const { exec } = await import("node:child_process");
+        const { promisify } = await import("node:util");
+        const execAsync = promisify(exec);
 
-    fs.mkdirSync(outputDir, { recursive: true });
-    
-    const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
-    await execAsync(extractCommand);
+        fs.mkdirSync(outputDir, { recursive: true });
+        
+        const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
+        await execAsync(extractCommand);
+      }
+    } catch (error) {
+      throw new Error(`Failed to extract archive: ${error}`);
+    }
   }
 
   static getTemporaryPath(prefix: string = "temp"): string {
