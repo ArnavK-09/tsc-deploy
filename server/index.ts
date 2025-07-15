@@ -35,7 +35,7 @@ app.use("/*", apiAuth);
 app.route("/", apiRouter);
 
 app.notFound((c) => {
-  return c.json({ error: "Not found" }, 407);
+  return c.json({ error: "Not found" }, 404);
 });
 
 app.onError((err, c) => {
