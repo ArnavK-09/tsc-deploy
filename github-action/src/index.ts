@@ -157,7 +157,7 @@ async function run(): Promise<void> {
     console.log(await response4.text());
     console.log("deploymentRequest");
     const response2 = await fetch(
-      `${inputs.deployServerUrl}/process`,
+      `${inputs.deployServerUrl}/api/process`,
       {
         method: 'POST',
         body: JSON.stringify({}),
