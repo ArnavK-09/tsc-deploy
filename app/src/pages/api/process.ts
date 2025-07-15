@@ -77,7 +77,7 @@ export async function POST(context: { request: Request }) {
         });
       }
 
-      if (deploymentRequest.eventType === "push") {
+      if (deploymentRequest.eventType === "push" && deploymentRequest.create_release) {
         const branch = deploymentRequest.ref.replace("refs/heads/", "");
         if (branch === "main" || branch === "master") {
           try {
