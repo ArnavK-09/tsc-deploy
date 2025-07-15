@@ -41,6 +41,22 @@ export async function GET(context: { request: Request }) {
       queuePosition: queueLength,
     };
 
+    // If the job has failed, return error response with job details
+    if (job.status === "failed") {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          ...buildStatus,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
     return createSuccessResponse(buildStatus);
   } catch (error) {
     console.error("Error getting build status:", error);
