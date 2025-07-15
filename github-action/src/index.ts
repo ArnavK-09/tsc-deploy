@@ -298,12 +298,10 @@ async function waitForBuildCompletion(
           throw new Error("Build was cancelled");
         }
       } else {
-        core.warning(`Failed to check build status: ${response.status}`);
         throw new Error(`Build failed: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      core.warning(`Failed to check build status: ${error}`);
-      throw new Error(`Build failed: ${error}`);
+      core.warning(`Failed to verify build status: ${error}`);
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));

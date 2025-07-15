@@ -323,7 +323,7 @@ export class JobQueue {
 
     const response = await fetch(archiveUrl, {
       headers: {
-        Authorization: `token ${jobData.githubToken}`,
+        Authorization: `Bearer ${jobData.githubToken}`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       },
     });
