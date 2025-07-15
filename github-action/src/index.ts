@@ -160,11 +160,15 @@ async function run(): Promise<void> {
       body: JSON.stringify(deploymentRequest),
       headers: {
         Authorization: `Bearer ${inputs.githubToken}`,
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
       throwHttpErrors: false
     });
-console.log(response, await response.text())
-process.exit(0)
+    console.log(response, await response.text())
+    process.exit(0)
     core.info("🔍 Sending deployment request...");
     core.info("✅ Deployment request sent.");
 
