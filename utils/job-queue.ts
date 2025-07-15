@@ -278,16 +278,26 @@ export class JobQueue {
     );
 
     // Use Node.js fetch instead of curl for better Vercel compatibility
+    console.log(`Downloading archive from provided URL: ${jobData.repoArchiveUrl}`);
+    console.log(`Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`);
+    
     const response = await fetch(jobData.repoArchiveUrl!, {
       headers: {
-        Authorization: `token ${jobData.githubToken}`,
+        Authorization: `Bearer ${jobData.githubToken}`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       },
     });
 
     if (!response.ok) {
+      console.error(`Archive download failed: ${response.status} ${response.statusText}`);
+      console.error(`URL: ${jobData.repoArchiveUrl}`);
+      console.error(`Headers sent:`, {
+        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`,
+        "User-Agent": "tscircuit-deploy/1.0.0",
+      });
+      
       throw new Error(
-        `Failed to download archive: ${response.status} ${response.statusText}`,
+        `Failed to download archive: ${response.status} ${response.statusText}. URL: ${jobData.repoArchiveUrl}`,
       );
     }
 
@@ -319,8 +329,11 @@ export class JobQueue {
     workDir: string,
   ): Promise<void> {
     // This is a simpler fallback that downloads the archive directly
-    const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/archive/${jobData.ref}.tar.gz`;
-
+    const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/zipball/${jobData.ref}.tar.gz`;
+    
+    console.log(`Attempting to download archive from: ${archiveUrl}`);
+    console.log(`Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`);
+    
     const response = await fetch(archiveUrl, {
       headers: {
         Authorization: `Bearer ${jobData.githubToken}`,
@@ -329,8 +342,15 @@ export class JobQueue {
     });
 
     if (!response.ok) {
+      console.error(`Archive download failed: ${response.status} ${response.statusText}`);
+      console.error(`URL: ${archiveUrl}`);
+      console.error(`Headers sent:`, {
+        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`,
+        "User-Agent": "tscircuit-deploy/1.0.0",
+      });
+      
       throw new Error(
-        `Failed to download repository: ${response.status} ${response.statusText}`,
+        `Failed to download repository: ${response.status} ${response.statusText}. URL: ${archiveUrl}`,
       );
     }
 
