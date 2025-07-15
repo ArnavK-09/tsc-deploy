@@ -1,14 +1,116 @@
 import { db, deployments } from "../../../../db";
-import { createSuccessResponse, createErrorResponse } from "@/utils/http";
+import { desc, eq, and, sql } from "drizzle-orm";
+import { createErrorResponse, createSuccessResponse } from "@/utils/http";
+import type { DeploymentView } from "../../../../shared/types";
 
-export async function GET() {
+export async function GET(context: { request: Request }) {
   try {
-    const result = await db.select().from(deployments);
+    const url = new URL(context.request.url);
+    const page = parseInt(url.searchParams.get("page") || "1", 10);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") || "20", 10), 100);
+    const owner = url.searchParams.get("owner");
+    const repo = url.searchParams.get("repo");
+    const status = url.searchParams.get("status");
+    const id = url.searchParams.get("id");
+
+    // If specific deployment ID is requested
+    if (id) {
+      const [deployment] = await db
+        .select()
+        .from(deployments)
+        .where(eq(deployments.id, id))
+        .limit(1);
+
+      if (!deployment) {
+        return createErrorResponse("Deployment not found", 404);
+      }
+
+      const deploymentView: DeploymentView = {
+        id: deployment.id,
+        owner: deployment.owner,
+        repo: deployment.repo,
+        commitSha: deployment.commitSha,
+        status: deployment.status || "pending",
+        metaType: deployment.metaType,
+        meta: deployment.meta,
+        buildDuration: deployment.buildDuration,
+        totalCircuitFiles: deployment.totalCircuitFiles || 0,
+        createdAt: deployment.createdAt.toISOString(),
+        buildCompletedAt: deployment.buildCompletedAt?.toISOString() || null,
+        errorMessage: deployment.errorMessage,
+      };
+
+      return createSuccessResponse({
+        deployment: deploymentView,
+        snapshotResult: deployment.snapshotResult,
+      });
+    }
+
+    // Build query conditions
+    const conditions = [];
+    if (owner) conditions.push(eq(deployments.owner, owner));
+    if (repo) conditions.push(eq(deployments.repo, repo));
+    if (status) conditions.push(eq(deployments.status, status as any));
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get deployments with pagination
+    const allDeployments = await db
+      .select()
+      .from(deployments)
+      .where(whereClause)
+      .orderBy(desc(deployments.createdAt))
+      .limit(limit)
+      .offset((page - 1) * limit);
+
+    // Transform to view format
+    const deploymentViews: DeploymentView[] = allDeployments.map(deployment => ({
+      id: deployment.id,
+      owner: deployment.owner,
+      repo: deployment.repo,
+      commitSha: deployment.commitSha,
+      status: deployment.status || "pending",
+      metaType: deployment.metaType,
+      meta: deployment.meta,
+      buildDuration: deployment.buildDuration,
+      totalCircuitFiles: deployment.totalCircuitFiles || 0,
+      createdAt: deployment.createdAt.toISOString(),
+      buildCompletedAt: deployment.buildCompletedAt?.toISOString() || null,
+      errorMessage: deployment.errorMessage,
+    }));
+
+    // Get total count for pagination
+    const [{ count: totalCount }] = await db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(deployments)
+      .where(whereClause);
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNext = page < totalPages;
+    const hasPrevious = page > 1;
+
     return createSuccessResponse({
-      deployments: result,
+      deployments: deploymentViews,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNext,
+        hasPrevious,
+      },
+      filters: {
+        owner,
+        repo,
+        status,
+      },
     });
+
   } catch (error) {
     console.error("Error fetching deployments:", error);
-    return createErrorResponse("Failed to fetch deployments", 500);
+    if (error instanceof Error) {
+      return createErrorResponse(`Failed to fetch deployments: ${error.message}`, 500);
+    }
+    return createErrorResponse("Internal server error", 500);
   }
 }

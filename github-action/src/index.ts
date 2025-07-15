@@ -56,6 +56,13 @@ async function run(): Promise<void> {
     const startTime = Date.now();
     core.info("⏱️ Start time recorded.");
 
+    // Validate that this is a supported event
+    if (!["push", "pull_request"].includes(context.eventName)) {
+      core.warning(`⚠️ Unsupported event type: ${context.eventName}`);
+      core.setOutput("status", "skipped");
+      return;
+    }
+
     core.info("🔍 Creating deployment...");
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
@@ -80,7 +87,7 @@ async function run(): Promise<void> {
     core.info(`✅ Deployment created with ID: ${deploymentId}`);
 
     let checkRunId: number | undefined;
-    if (context.eventName == "pull_request") {
+    if (context.eventName === "pull_request") {
       core.info("🔍 Creating check run for pull request...");
       const { checkRunId: checkRunIdCreated } =
         await userOctokit.createCheckRun({
@@ -100,6 +107,8 @@ async function run(): Promise<void> {
     }
 
     core.info("🔍 Preparing build request...");
+    
+    // Create archive URL for faster download
     const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/archive/${context.sha}.tar.gz`;
     
     const buildRequest: SimpleBuildRequest = {
@@ -128,24 +137,29 @@ async function run(): Promise<void> {
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
       create_release:
-        context.eventName == "push" && (inputs.create_release || false),
+        context.eventName === "push" && (inputs.create_release || false),
       repoArchiveUrl,
     };
     core.info("✅ Build request prepared");
 
     core.info("🔍 Sending build request...");
-    const response = await ky.post(`${inputs.deployServerUrl}/api/build`, {
+    const serverUrl = inputs.deployServerUrl || DEPLOY_SERVER_URL;
+    
+    const response = await ky.post(`${serverUrl}/api/build`, {
       body: JSON.stringify(buildRequest),
       headers: {
         Authorization: `Bearer ${inputs.githubToken}`,
         "Content-Type": "application/json",
       },
+      timeout: 30000, // 30 second timeout
       throwHttpErrors: false,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       core.error("❌ Build request failed.");
+      core.error(`Response status: ${response.status}`);
+      core.error(`Response body: ${errorText}`);
       throw new Error(`Build request failed: ${response.status} ${errorText}`);
     }
 
@@ -168,19 +182,21 @@ async function run(): Promise<void> {
     core.info(`🆔 Job ID: ${jobId}`);
     core.info(`📍 Queue position: ${queuePosition}`);
 
-    await waitForBuildCompletion(inputs.deployServerUrl || DEPLOY_SERVER_URL, inputs.githubToken, jobId);
+    // Monitor build progress
+    const buildResult = await waitForBuildCompletion(serverUrl, inputs.githubToken, jobId);
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
 
     core.setOutput("deployment-id", deploymentId);
     core.setOutput("job-id", jobId);
     core.setOutput("build-time", totalTime.toString());
-    core.setOutput("status", "queued");
+    core.setOutput("status", buildResult.status);
+    core.setOutput("circuit-count", buildResult.circuitCount?.toString() || "0");
 
     const previewUrl = `${DEPLOY_URL}/deployments/${deploymentId}`;
     core.setOutput("preview-url", previewUrl);
 
-    core.info(`\n✅ Build queued successfully`);
+    core.info(`\n✅ Build ${buildResult.status}`);
     core.info(`🆔 Deployment ID: ${deploymentId}`);
     core.info(`🔗 Job ID: ${jobId}`);
     core.info(`⏱️ Total time: ${totalTime}s`);
@@ -199,12 +215,13 @@ async function waitForBuildCompletion(
   serverUrl: string,
   token: string,
   jobId: string
-): Promise<void> {
+): Promise<{ status: string; circuitCount?: number }> {
   core.info("⏳ Monitoring build progress...");
   
-  const maxWaitTime = 20 * 60 * 1000;
+  const maxWaitTime = 20 * 60 * 1000; // 20 minutes
   const startTime = Date.now();
-  const pollInterval = 10000;
+  const pollInterval = 10000; // 10 seconds
+  let lastProgress = 0;
 
   while (Date.now() - startTime < maxWaitTime) {
     try {
@@ -212,6 +229,7 @@ async function waitForBuildCompletion(
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        timeout: 10000,
         throwHttpErrors: false,
       });
 
@@ -219,14 +237,38 @@ async function waitForBuildCompletion(
         const result = (await response.json()) as any;
         const status: BuildStatus = result;
 
-        core.info(`📊 Build status: ${status.status} (${status.progress}%)`);
-        if (status.message) {
+        // Only log progress updates to avoid spam
+        if (status.progress !== lastProgress) {
+          core.info(`📊 Build status: ${status.status} (${status.progress}%)`);
+          lastProgress = status.progress;
+        }
+        
+        if (status.message && status.progress % 25 === 0) {
           core.info(`💬 ${status.message}`);
         }
 
         if (status.status === "completed") {
           core.info("✅ Build completed successfully!");
-          return;
+          
+          // Try to get circuit count from deployment
+          try {
+            const deploymentResponse = await ky.get(`${serverUrl}/api/deployments?id=${jobId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+              throwHttpErrors: false,
+            });
+            
+            if (deploymentResponse.ok) {
+              const deploymentResult = await deploymentResponse.json() as any;
+              return { 
+                status: "completed", 
+                circuitCount: deploymentResult.circuitCount || 0 
+              };
+            }
+          } catch (e) {
+            core.warning("Could not fetch circuit count");
+          }
+          
+          return { status: "completed" };
         }
 
         if (status.status === "failed") {
@@ -236,6 +278,8 @@ async function waitForBuildCompletion(
         if (status.status === "cancelled") {
           throw new Error("Build was cancelled");
         }
+      } else {
+        core.warning(`Failed to check build status: ${response.status}`);
       }
     } catch (error) {
       core.warning(`Failed to check build status: ${error}`);
@@ -245,6 +289,7 @@ async function waitForBuildCompletion(
   }
 
   core.warning("⚠️ Build monitoring timed out after 20 minutes");
+  return { status: "timeout" };
 }
 
 run();

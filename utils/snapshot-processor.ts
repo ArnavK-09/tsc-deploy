@@ -2,13 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  convertCircuitJsonToPcbSvg,
-  convertCircuitJsonToSchematicSvg,
-} from "circuit-to-svg";
-import { convertCircuitJsonToSimple3dSvg } from "circuit-json-to-simple-3d";
 import { CircuitRunner } from "tscircuit";
-import { SnapshotResult } from "../shared/types";
+import { createHash } from "node:crypto";
+import { SnapshotResult, CircuitFile } from "../shared/types";
 
 const execAsync = promisify(exec);
 const ALLOWED_FILE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
@@ -183,39 +179,29 @@ export class SnapshotProcessor {
     }
   }
 
-  private async generateCircuitSvg(
-    circuitFile: string,
-    componentType: "pcb" | "schematic" | "3d"
-  ): Promise<string | null> {
+  private async getFileMetadata(filePath: string): Promise<{
+    fileSize: number;
+    lastModified: string;
+    checksum: string;
+  }> {
+    const absolutePath = path.resolve(this.workingDirectory, filePath);
+    const stats = fs.statSync(absolutePath);
+    const content = fs.readFileSync(absolutePath, "utf-8");
+    const checksum = createHash("sha256").update(content).digest("hex");
+
+    return {
+      fileSize: stats.size,
+      lastModified: stats.mtime.toISOString(),
+      checksum,
+    };
+  }
+
+  private async getRepositorySize(): Promise<number> {
     try {
-      const circuitJson = await this.generateCircuitJson(circuitFile);
-
-      if (!circuitJson || (Array.isArray(circuitJson) && circuitJson.length === 0)) {
-        console.warn(`No circuit data generated for ${circuitFile}`);
-        return null;
-      }
-
-      let svgContent: string;
-
-      switch (componentType) {
-        case "pcb":
-          svgContent = convertCircuitJsonToPcbSvg(circuitJson);
-          break;
-        case "schematic":
-          svgContent = convertCircuitJsonToSchematicSvg(circuitJson);
-          break;
-        case "3d":
-          svgContent = await convertCircuitJsonToSimple3dSvg(circuitJson);
-          break;
-        default:
-          throw new Error(`Unsupported component type: ${componentType}`);
-      }
-
-      this.updateProgress("rendering", 0, `Created ${componentType.toUpperCase()} SVG`);
-      return svgContent;
-    } catch (error) {
-      console.error(`Failed to create SVG for ${circuitFile}: ${error}`);
-      return null;
+      const { FileHandler } = await import("./file-handler");
+      return await FileHandler.getDirectorySize(this.workingDirectory);
+    } catch {
+      return 0;
     }
   }
 
@@ -236,6 +222,11 @@ export class SnapshotProcessor {
         this.updateProgress("complete", 100, "No circuit files found");
         result.success = true;
         result.buildTime = Math.round((Date.now() - startTime) / 1000);
+        result.metadata = {
+          totalFiles: 0,
+          repositorySize: await this.getRepositorySize(),
+          buildEnvironment: process.env.NODE_ENV || "production",
+        };
         return result;
       }
 
@@ -247,23 +238,28 @@ export class SnapshotProcessor {
           const fileProgress = Math.round(((index + 1) / totalFiles) * 70) + 25;
           this.updateProgress("processing", fileProgress, `Processing ${file}`);
           
-          const pcbSvg = await this.generateCircuitSvg(file, "pcb");
-          const schematicSvg = await this.generateCircuitSvg(file, "schematic");
+          const circuitJson = await this.generateCircuitJson(file);
+          const metadata = await this.getFileMetadata(file);
           
-          return {
+          const circuitFile: CircuitFile = {
             path: file,
             name: path.basename(file),
-            svg: {
-              pcb: pcbSvg,
-              schematic: schematicSvg,
-            },
+            circuitJson,
+            metadata,
           };
+          
+          return circuitFile;
         })
       );
 
       this.updateProgress("complete", 100, `Successfully processed ${circuitFiles.length} circuit files`);
       result.success = true;
       result.buildTime = Math.round((Date.now() - startTime) / 1000);
+      result.metadata = {
+        totalFiles: circuitFiles.length,
+        repositorySize: await this.getRepositorySize(),
+        buildEnvironment: process.env.NODE_ENV || "production",
+      };
 
       return result;
     } catch (error) {

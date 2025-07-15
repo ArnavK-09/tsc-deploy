@@ -4,6 +4,7 @@ import { SnapshotProcessor, BuildProgress } from "./snapshot-processor";
 import { GitHubService } from "../shared/github.service";
 import { DEPLOY_URL } from "../shared/constants";
 import { generatePRComment } from "./pr-comment";
+import type { PRCommentData } from "./pr-comment";
 import { env } from "../shared/env";
 
 export interface BuildJobData {
@@ -171,6 +172,7 @@ export class JobQueue {
         .where(eq(buildJobs.id, job.id));
 
       if (job.retryCount < job.maxRetries) {
+        console.log(`Retrying job ${job.id} (attempt ${job.retryCount + 1}/${job.maxRetries})`);
         await db
           .update(buildJobs)
           .set({
@@ -258,6 +260,7 @@ export class JobQueue {
 
     const totalTime = Math.round((Date.now() - new Date(job.startedAt!).getTime()) / 1000);
 
+    // Update deployment in database
     await db
       .update(deployments)
       .set({
@@ -271,6 +274,7 @@ export class JobQueue {
       .where(eq(deployments.id, jobData.deploymentId));
 
     if (snapshot.success) {
+      // Update GitHub deployment status
       await userOctokit.createDeploymentStatus({
         owner: jobData.owner,
         repo: jobData.repo,
@@ -280,45 +284,104 @@ export class JobQueue {
         logUrl: `${jobData.context.serverUrl}/${jobData.owner}/${jobData.repo}/actions/runs/${jobData.context.runId}`,
       });
 
+      // Generate and post PR comment for pull requests
       if (jobData.eventType === "pull_request") {
-        const prComment = generatePRComment({
-          deploymentId: jobData.deploymentId,
-          previewUrl: `${DEPLOY_URL}/deployments/${jobData.deploymentId_github}`,
-          buildTime: `${totalTime}s`,
-          circuitCount: snapshot.circuitFiles.length,
-          status: "ready",
-          snapshotResult: snapshot,
-        });
+        try {
+          const prCommentData: PRCommentData = {
+            deploymentId: jobData.deploymentId,
+            previewUrl: `${DEPLOY_URL}/deployments/${jobData.deploymentId_github}`,
+            buildTime: `${totalTime}s`,
+            circuitCount: snapshot.circuitFiles.length,
+            status: "ready",
+            snapshotResult: snapshot,
+          };
 
-        await botOctokit.createPRComment({
-          owner: jobData.owner,
-          repo: jobData.repo,
-          issueNumber: Number(jobData.meta),
-          body: prComment,
-        });
+          const prComment = generatePRComment(prCommentData);
+
+          await botOctokit.createPRComment({
+            owner: jobData.owner,
+            repo: jobData.repo,
+            issueNumber: Number(jobData.meta),
+            body: prComment,
+          });
+
+          console.log(`PR comment posted for deployment ${jobData.deploymentId}`);
+        } catch (error) {
+          console.error("Failed to post PR comment:", error);
+        }
       }
 
+      // Update check run for pull requests
       if (jobData.checkRunId) {
-        await userOctokit.updateCheckRun({
-          owner: jobData.owner,
-          repo: jobData.repo,
-          checkRunId: jobData.checkRunId,
-          status: "completed",
-          conclusion: "success",
-          detailsUrl: `${DEPLOY_URL}/deployments/${jobData.deploymentId_github}`,
-          output: {
-            title: "✅ Preview Deploy Ready",
-            summary: `Successfully built ${snapshot.circuitFiles.length} circuit${snapshot.circuitFiles.length === 1 ? "" : "s"} in ${totalTime}s`,
-            text: `## 🔗 Preview URL\n${DEPLOY_URL}/deployments/${jobData.deploymentId_github}\n\n## 📊 Build Details\n- Circuits: ${snapshot.circuitFiles.length}\n- Build time: ${totalTime}s\n- Status: Ready`,
-          },
-        });
+        try {
+          await userOctokit.updateCheckRun({
+            owner: jobData.owner,
+            repo: jobData.repo,
+            checkRunId: jobData.checkRunId,
+            status: "completed",
+            conclusion: "success",
+            detailsUrl: `${DEPLOY_URL}/deployments/${jobData.deploymentId_github}`,
+            output: {
+              title: "✅ Preview Deploy Ready",
+              summary: `Successfully built ${snapshot.circuitFiles.length} circuit${snapshot.circuitFiles.length === 1 ? "" : "s"} in ${totalTime}s`,
+              text: `## 🔗 Preview URL\n${DEPLOY_URL}/deployments/${jobData.deploymentId_github}\n\n## 📊 Build Details\n- Circuits: ${snapshot.circuitFiles.length}\n- Build time: ${totalTime}s\n- Status: Ready`,
+            },
+          });
+
+          console.log(`Check run updated for deployment ${jobData.deploymentId}`);
+        } catch (error) {
+          console.error("Failed to update check run:", error);
+        }
+      }
+
+      // Handle release creation for push events
+      if (jobData.eventType === "push" && jobData.create_release) {
+        try {
+          const branch = jobData.ref.replace("refs/heads/", "");
+          if (branch === "main" || branch === "master") {
+            const { tag: lastTag } = await userOctokit.getLatestTag({
+              owner: jobData.owner,
+              repo: jobData.repo,
+            });
+
+            const commitMessage = jobData.context?.message || "";
+            const packageVersion = userOctokit.generateNextVersion(
+              lastTag,
+              commitMessage,
+            );
+
+            const { tagSha } = await userOctokit.createTag({
+              owner: jobData.owner,
+              repo: jobData.repo,
+              tag: `v${packageVersion}`,
+              message: `Release v${packageVersion}`,
+              object: jobData.ref.replace("refs/heads/", ""),
+              type: "commit",
+            });
+
+            if (tagSha) {
+              await userOctokit.createRef({
+                owner: jobData.owner,
+                repo: jobData.repo,
+                ref: `refs/tags/v${packageVersion}`,
+                sha: tagSha,
+              });
+
+              console.log(`Release v${packageVersion} created for deployment ${jobData.deploymentId}`);
+            }
+          }
+        } catch (error) {
+          console.error("Error creating release:", error);
+        }
       }
     }
   }
 
   private async handleJobFailure(job: BuildJob, jobData: BuildJobData, errorMessage: string) {
     const userOctokit = new GitHubService({ token: jobData.githubToken });
+    const botOctokit = new GitHubService({ token: env.GITHUB_BOT_TOKEN });
 
+    // Update deployment status
     await db
       .update(deployments)
       .set({
@@ -328,6 +391,7 @@ export class JobQueue {
       })
       .where(eq(deployments.id, jobData.deploymentId));
 
+    // Update GitHub deployment status
     await userOctokit.createDeploymentStatus({
       owner: jobData.owner,
       repo: jobData.repo,
@@ -336,18 +400,51 @@ export class JobQueue {
       description: `Build failed: ${errorMessage}`,
     });
 
+    // Post failure comment to PR
+    if (jobData.eventType === "pull_request") {
+      try {
+        const failureComment = `## ❌ tscircuit Deploy Failed
+
+**Deployment ID:** \`${jobData.deploymentId}\`
+**Error:** ${errorMessage}
+
+Please check your circuit files and try again.
+
+---
+*Powered by [tscircuit](https://tscircuit.com)*`;
+
+        await botOctokit.createPRComment({
+          owner: jobData.owner,
+          repo: jobData.repo,
+          issueNumber: Number(jobData.meta),
+          body: failureComment,
+        });
+
+        console.log(`Failure comment posted for deployment ${jobData.deploymentId}`);
+      } catch (error) {
+        console.error("Failed to post failure comment:", error);
+      }
+    }
+
+    // Update check run
     if (jobData.checkRunId) {
-      await userOctokit.updateCheckRun({
-        owner: jobData.owner,
-        repo: jobData.repo,
-        checkRunId: jobData.checkRunId,
-        status: "completed",
-        conclusion: "failure",
-        output: {
-          title: "❌ Build Failed",
-          summary: `Build failed: ${errorMessage}`,
-        },
-      });
+      try {
+        await userOctokit.updateCheckRun({
+          owner: jobData.owner,
+          repo: jobData.repo,
+          checkRunId: jobData.checkRunId,
+          status: "completed",
+          conclusion: "failure",
+          output: {
+            title: "❌ Build Failed",
+            summary: `Build failed: ${errorMessage}`,
+          },
+        });
+
+        console.log(`Check run updated with failure for deployment ${jobData.deploymentId}`);
+      } catch (error) {
+        console.error("Failed to update check run with failure:", error);
+      }
     }
   }
 
@@ -365,6 +462,7 @@ export class JobQueue {
     try {
       const fs = await import("node:fs");
       fs.rmSync(workingDirectory, { recursive: true, force: true });
+      console.log(`Cleaned up workspace: ${workingDirectory}`);
     } catch (error) {
       console.warn(`Failed to cleanup workspace ${workingDirectory}:`, error);
     }

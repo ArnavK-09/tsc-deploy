@@ -1,108 +1,167 @@
-import { SnapshotResult } from "../types";
+import { SnapshotResult } from "../shared/types";
+import { DEPLOY_URL } from "../shared/constants";
 
-export function createDeploymentTable(data: {
+export interface PRCommentData {
   deploymentId: string;
   previewUrl: string;
   buildTime: string;
   circuitCount: number;
-  status: "ready" | "error" | "skipped";
-}): string {
-  const { deploymentId, previewUrl, circuitCount, status } = data;
-
-  const statusDisplay = {
-    ready: "✅ Ready",
-    error: "❌ Failed",
-    skipped: "⏭️ Skipped",
-  }[status];
-
-  const inspectUrl = `${previewUrl}/inspect`;
-  const currentTime = new Date().toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-
-  return `
-## ✨ tscircuit deploy
-
-| Deploment ID | Status | Preview | Circuits | Updated |
-| :--- | :----- | :------ | :------- | :------ |
-| **${deploymentId.replace("deployment-", "")}** | ${statusDisplay} ([Inspect](${inspectUrl})) | ${status === "ready" ? `[Visit Preview](${previewUrl})` : "—"} | ${circuitCount} files | ${currentTime} |`.trim();
-}
-
-export function createImagePreviewTable(
-  circuitFiles: SnapshotResult["circuitFiles"],
-): string {
-  if (!circuitFiles.length) return "";
-
-  const circuitGroups = new Map<string, typeof circuitFiles>();
-
-  circuitFiles.forEach((file) => {
-    if (!circuitGroups.has(file.name)) {
-      circuitGroups.set(file.name, []);
-    }
-    circuitGroups.get(file.name)!.push(file);
-  });
-
-  const tableRows = Array.from(circuitGroups.entries())
-    .map(([circuitName]) => {
-      const pcbSvg = circuitGroups.get(circuitName)?.[0]?.svg.pcb;
-      const schematicSvg = circuitGroups.get(circuitName)?.[0]?.svg.schematic;
-
-      const pcbCell = `<img src="${encodeURIComponent(pcbSvg || "")}" alt="PCB" width="120" height="80" />`;
-      const schematicCell = `<img src="${encodeURIComponent(schematicSvg || "")}" alt="Schematic" width="120" height="80" />`;
-
-      return `| **${circuitGroups.get(circuitName)?.[0]?.name}** | ${pcbCell} | ${schematicCell} |`;
-    })
-    .join("\n");
-
-  return `
-## 📸 Circuit Previews
-
-| Circuit | PCB | Schematic |
-| :------ | :-: | :-------: |
-${tableRows}`;
-}
-
-export function generatePRComment(data: {
-  deploymentId: string;
-  previewUrl: string;
-  buildTime: string;
-  circuitCount: number;
-  status: "ready" | "error" | "skipped";
+  status: "ready" | "error" | "pending";
   snapshotResult: SnapshotResult;
-}): string {
-  const {
-    deploymentId,
-    previewUrl,
-    buildTime,
-    circuitCount,
-    status,
-    snapshotResult,
-  } = data;
+}
 
-  const deploymentTable = createDeploymentTable({
-    deploymentId,
-    previewUrl,
-    buildTime,
-    circuitCount,
-    status,
-  });
+export function generatePRComment(data: PRCommentData): string {
+  const { deploymentId, previewUrl, buildTime, circuitCount, status, snapshotResult } = data;
 
-  const imagePreviewTable =
-    snapshotResult.circuitFiles.length > 0
-      ? createImagePreviewTable(snapshotResult.circuitFiles)
-      : "";
+  if (status === "error") {
+    return `## ❌ tscircuit Deploy Failed
 
-  return `
-
-${deploymentTable}
-
-${imagePreviewTable}
+**Deployment ID:** \`${deploymentId}\`
+**Build Time:** ${buildTime}
+**Error:** ${snapshotResult.error || "Unknown error occurred"}
 
 ---
-*🤖 Automated deployment by [tscircuit](https://tscircuit.com)*`;
+*Powered by [tscircuit](https://tscircuit.com)*`;
+  }
+
+  if (status === "pending") {
+    return `## 🔄 tscircuit Deploy In Progress
+
+**Deployment ID:** \`${deploymentId}\`
+**Status:** Building...
+
+---
+*Powered by [tscircuit](https://tscircuit.com)*`;
+  }
+
+  let comment = `## ✅ tscircuit Deploy Ready
+
+**🔗 Preview URL:** ${previewUrl}
+**⏱️ Build Time:** ${buildTime}
+**📊 Circuits:** ${circuitCount}
+**🆔 Deployment ID:** \`${deploymentId}\`
+
+`;
+
+  if (circuitCount > 0 && snapshotResult.circuitFiles) {
+    comment += `### 🔌 Circuit Files\n\n`;
+    
+    snapshotResult.circuitFiles.forEach((file, index) => {
+      const fileName = file.name;
+      const pcbSvgUrl = `${DEPLOY_URL}/api/svg/${deploymentId}/${index}/pcb?width=300&height=200`;
+      const schematicSvgUrl = `${DEPLOY_URL}/api/svg/${deploymentId}/${index}/schematic?width=300&height=200`;
+      const pcb3dSvgUrl = `${DEPLOY_URL}/api/svg/${deploymentId}/${index}/3d?width=300&height=200`;
+
+      comment += `<details>
+<summary><strong>${fileName}</strong></summary>
+
+#### PCB View
+<img src="${pcbSvgUrl}" alt="PCB view of ${fileName}" width="300" />
+
+#### Schematic View  
+<img src="${schematicSvgUrl}" alt="Schematic view of ${fileName}" width="300" />
+
+#### 3D View
+<img src="${pcb3dSvgUrl}" alt="3D view of ${fileName}" width="300" />
+
+**📈 Circuit Complexity:** ${getCircuitComplexity(file.circuitJson)}
+**📏 File Size:** ${file.metadata?.fileSize ? formatBytes(file.metadata.fileSize) : 'Unknown'}
+
+</details>
+
+`;
+    });
+  }
+
+  if (snapshotResult.metadata) {
+    comment += `### 📊 Build Metadata
+
+- **Total Files Processed:** ${snapshotResult.metadata.totalFiles}
+- **Repository Size:** ${formatBytes(snapshotResult.metadata.repositorySize)}
+- **Build Environment:** ${snapshotResult.metadata.buildEnvironment}
+- **Build Duration:** ${snapshotResult.buildTime}s
+
+`;
+  }
+
+  comment += `### 🔍 View Options
+
+- [🌐 Full Preview](${previewUrl})
+- [📋 Deployment Details](${previewUrl}/details)
+- [🔗 Share Link](${previewUrl}/share)
+
+---
+*Powered by [tscircuit](https://tscircuit.com) • Built with ❤️*`;
+
+  return comment;
+}
+
+function getCircuitComplexity(circuitJson: any): string {
+  if (!circuitJson) return "Unknown";
+  
+  let elementCount = 0;
+  if (Array.isArray(circuitJson)) {
+    elementCount = circuitJson.length;
+  } else if (typeof circuitJson === 'object') {
+    elementCount = 1;
+  }
+
+  if (elementCount > 100) return "High";
+  if (elementCount > 20) return "Medium";
+  return "Low";
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+export function generateSuccessComment(data: {
+  deploymentId: string;
+  previewUrl: string;
+  buildTime: string;
+  circuitCount: number;
+}): string {
+  return `## ✅ tscircuit Deploy Complete
+
+**🔗 Preview:** ${data.previewUrl}
+**⏱️ Time:** ${data.buildTime}
+**📊 Circuits:** ${data.circuitCount}
+
+Your circuits are now live! 🎉`;
+}
+
+export function generateFailureComment(data: {
+  deploymentId: string;
+  error: string;
+  buildTime: string;
+}): string {
+  return `## ❌ tscircuit Deploy Failed
+
+**🆔 Deployment:** \`${data.deploymentId}\`
+**⏱️ Time:** ${data.buildTime}
+**🔍 Error:** ${data.error}
+
+Please check your circuit files and try again.`;
+}
+
+export function generateQueuedComment(data: {
+  deploymentId: string;
+  queuePosition?: number;
+}): string {
+  const positionText = data.queuePosition 
+    ? `Position in queue: ${data.queuePosition}` 
+    : "Queued for processing";
+
+  return `## 🔄 tscircuit Deploy Queued
+
+**🆔 Deployment:** \`${data.deploymentId}\`
+**📍 Status:** ${positionText}
+
+Your build will start shortly...`;
 }

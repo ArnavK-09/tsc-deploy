@@ -1,21 +1,29 @@
 import { z } from "zod";
 
+export const CircuitFileSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  circuitJson: z.any(), // Store the actual circuit JSON
+  metadata: z.object({
+    fileSize: z.number(),
+    lastModified: z.string(),
+    checksum: z.string(),
+  }).optional(),
+});
+
 export const SnapshotResultSchema = z.object({
-  circuitFiles: z.array(
-    z.object({
-      path: z.string(),
-      name: z.string(),
-      svg: z.object({
-        pcb: z.string().nullable(),
-        schematic: z.string().nullable(),
-      }),
-    }),
-  ),
+  circuitFiles: z.array(CircuitFileSchema),
   buildTime: z.number(),
   success: z.boolean(),
   error: z.string().optional(),
+  metadata: z.object({
+    totalFiles: z.number(),
+    repositorySize: z.number(),
+    buildEnvironment: z.string(),
+  }).optional(),
 });
 
+export type CircuitFile = z.infer<typeof CircuitFileSchema>;
 export type SnapshotResult = z.infer<typeof SnapshotResultSchema>;
 
 export const DeploymentRequestSchema = z.object({
@@ -76,3 +84,20 @@ export const BuildStatusSchema = z.object({
 });
 
 export type BuildStatus = z.infer<typeof BuildStatusSchema>;
+
+export const DeploymentViewSchema = z.object({
+  id: z.string(),
+  owner: z.string(),
+  repo: z.string(),
+  commitSha: z.string(),
+  status: z.enum(["skipped", "ready", "error", "pending"]),
+  metaType: z.enum(["push", "pull_request"]),
+  meta: z.string(),
+  buildDuration: z.number().nullable(),
+  totalCircuitFiles: z.number(),
+  createdAt: z.string(),
+  buildCompletedAt: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+});
+
+export type DeploymentView = z.infer<typeof DeploymentViewSchema>;
