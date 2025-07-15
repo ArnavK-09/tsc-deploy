@@ -1,20 +1,14 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import * as schema from "./schema.js";
+import { drizzle } from "drizzle-orm/vercel-postgres";
+import { sql } from "@vercel/postgres";
+import { deployments, buildJobs, buildArtifacts } from "./schema";
 
-const connectionString = process.env.DATABASE_URL;
+export const db = drizzle(sql);
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
-}
+export { deployments, buildJobs, buildArtifacts };
 
-const sql = postgres(connectionString, {
-  max: 20,
-  idle_timeout: 20,
-  connect_timeout: 10,
-});
-
-export const db = drizzle(sql, { schema });
-
-export * from "./schema.js";
-export { sql };
+export type Deployment = typeof deployments.$inferSelect;
+export type NewDeployment = typeof deployments.$inferInsert;
+export type BuildJob = typeof buildJobs.$inferSelect;
+export type NewBuildJob = typeof buildJobs.$inferInsert;
+export type BuildArtifact = typeof buildArtifacts.$inferSelect;
+export type NewBuildArtifact = typeof buildArtifacts.$inferInsert;

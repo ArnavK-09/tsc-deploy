@@ -6,12 +6,15 @@ import { generatePRComment } from "../../../../utils/pr-comment";
 import { env } from "../../../../shared/env";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import { extractGitHubToken } from "@/utils/auth";
+import { initializeServices } from "../../../../utils/startup";
 
 const botOctokit = new GitHubService({
   token: env.GITHUB_BOT_TOKEN,
 });
 
 export async function POST(context: { request: Request }) {
+  await initializeServices();
+  
   const request = context.request;
   const token = extractGitHubToken(request);
 
@@ -132,7 +135,10 @@ export async function POST(context: { request: Request }) {
         previewUrl: `${DEPLOY_URL}/deployments/${ID}`,
       });
     } else {
-      return createErrorResponse("Invalid event type" + JSON.stringify(deploymentRequest), 400);
+      return createErrorResponse(
+        "Invalid event type" + JSON.stringify(deploymentRequest),
+        400,
+      );
     }
   } catch (error) {
     console.error("Error processing deployment request:", error);

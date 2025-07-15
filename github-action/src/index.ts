@@ -1,11 +1,10 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { z } from "zod";
-import snapshotProject, { findCircuitFiles } from "./snapshot-project";
 import { DEPLOY_URL, DEPLOY_SERVER_URL } from "../../shared/constants";
 import { ulid } from "ulid";
 import ky from "ky";
-import { DeploymentRequest, SnapshotResult } from "../../shared/types";
+import { SimpleBuildRequest, BuildStatus } from "../../shared/types";
 import { GitHubService } from "../../shared/github.service";
 
 const InputSchema = z.object({
@@ -19,9 +18,9 @@ export interface DeploymentResult {
   deploymentId: string;
   previewUrl?: string;
   packageVersion?: string;
-  buildSnapshot: SnapshotResult | null;
+  jobId: string;
   circuitCount: number;
-  status: "skipped" | "ready" | "error" | "pending";
+  status: "skipped" | "ready" | "error" | "pending" | "queued";
 }
 
 async function run(): Promise<void> {
@@ -57,23 +56,6 @@ async function run(): Promise<void> {
     const startTime = Date.now();
     core.info("⏱️ Start time recorded.");
 
-    core.info("🔍 Finding circuit files...");
-    const circuitFiles = await findCircuitFiles(inputs.workingDirectory);
-    core.info(`✅ Found ${circuitFiles.length} circuit file(s).`);
-
-    if (circuitFiles.length === 0) {
-      core.warning("⚠️ No circuit files found");
-      core.setOutput("deployment-id", "no-circuits");
-      core.setOutput("circuit-count", "0");
-      core.setOutput("status", "skipped");
-      core.info("🚫 Deployment skipped due to no circuit files.");
-      return;
-    }
-
-    core.info(`📋 Found ${circuitFiles.length} circuit file(s), Building...\n`);
-    const buildResult = await runTscircuitBuild(inputs, circuitFiles);
-    core.info("✅ Build completed.");
-
     core.info("🔍 Creating deployment...");
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
@@ -93,7 +75,6 @@ async function run(): Promise<void> {
           context.eventName === "pull_request"
             ? context.payload.pull_request?.number?.toString() || ""
             : context.sha,
-        circuitCount: buildResult.snapshotResult.circuitFiles.length,
       },
     });
     core.info(`✅ Deployment created with ID: ${deploymentId}`);
@@ -110,19 +91,18 @@ async function run(): Promise<void> {
           status: "in_progress",
           detailsUrl: `${DEPLOY_URL}/deployments/${deploymentId}`,
           output: {
-            title: "🔃 Building Preview Deploy",
-            summary: `Found ${buildResult.snapshotResult.circuitFiles.length} circuit file${buildResult.snapshotResult.circuitFiles.length === 1 ? "" : "s"}. Starting build...`,
+            title: "🔃 Queuing Build",
+            summary: `Build queued for processing. Circuit detection and snapshot generation will be performed on the backend.`,
           },
         });
       checkRunId = checkRunIdCreated;
       core.info(`✅ Check run created with ID: ${checkRunId}`);
     }
 
-    const totalTime = Math.round((Date.now() - startTime) / 1000);
-    core.info(`⏱️ Total build time: ${totalTime}s`);
-
-    core.info("🔍 Preparing deployment request...");
-    const deploymentRequest: DeploymentRequest = {
+    core.info("🔍 Preparing build request...");
+    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/archive/${context.sha}.tar.gz`;
+    
+    const buildRequest: SimpleBuildRequest = {
       id: ID,
       owner: context.repo.owner,
       repo: context.repo.repo,
@@ -145,69 +125,67 @@ async function run(): Promise<void> {
         sha: context.payload.pull_request?.head.sha || context.sha,
         message: context.payload.head_commit?.message || "",
       },
-      snapshotResult: buildResult.snapshotResult,
-      buildTime: totalTime,
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
       create_release:
         context.eventName == "push" && (inputs.create_release || false),
+      repoArchiveUrl,
     };
-    core.info("✅ Deployment request prepared");
-    const response4 = await fetch(`${inputs.deployServerUrl}/api/health`);
-    console.log(await response4.text());
-    console.log("deploymentRequest");
-    const response = await ky.post(`${inputs.deployServerUrl}/api/process`, {
-      body: JSON.stringify(deploymentRequest),
+    core.info("✅ Build request prepared");
+
+    core.info("🔍 Sending build request...");
+    const response = await ky.post(`${inputs.deployServerUrl}/api/build`, {
+      body: JSON.stringify(buildRequest),
       headers: {
         Authorization: `Bearer ${inputs.githubToken}`,
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        "Content-Type": "application/json",
       },
-      throwHttpErrors: false
+      throwHttpErrors: false,
     });
-    console.log(response, await response.text())
-    process.exit(0)
-    core.info("🔍 Sending deployment request...");
-    core.info("✅ Deployment request sent.");
 
     if (!response.ok) {
-      core.error("❌ Deployment request failed.");
-      console.log(response);
-      console.log(await response.text());
-      throw new Error(response.statusText);
+      const errorText = await response.text();
+      core.error("❌ Build request failed.");
+      throw new Error(`Build request failed: ${response.status} ${errorText}`);
     }
 
-    core.info("🔍 Parsing deployment response...");
     const result = (await response.json()) as any;
-    core.info("✅ Deployment response parsed.");
+    core.info("✅ Build request sent successfully.");
 
     if (!result.success) {
-      core.error("❌ Deployment processing failed.");
-      throw new Error(result.error || "Deployment processing failed");
+      core.error("❌ Build request processing failed.");
+      throw new Error(result.error || "Build request processing failed");
     }
 
-    const previewUrl = result.previewUrl;
-    core.info("✅ Deployment processed successfully.");
+    const jobId: string = result.jobId;
+    const queuePosition = result.queuePosition || 0;
+    
+    if (!jobId) {
+      throw new Error("No job ID returned from build request");
+    }
+    
+    core.info(`✅ Build queued successfully`);
+    core.info(`🆔 Job ID: ${jobId}`);
+    core.info(`📍 Queue position: ${queuePosition}`);
+
+    await waitForBuildCompletion(inputs.deployServerUrl || DEPLOY_SERVER_URL, inputs.githubToken, jobId);
+
+    const totalTime = Math.round((Date.now() - startTime) / 1000);
 
     core.setOutput("deployment-id", deploymentId);
+    core.setOutput("job-id", jobId);
     core.setOutput("build-time", totalTime.toString());
-    core.setOutput("circuit-count", circuitFiles.length.toString());
-    core.setOutput("status", "ready");
+    core.setOutput("status", "queued");
 
-    if (previewUrl) {
-      core.setOutput("preview-url", previewUrl);
-    }
+    const previewUrl = `${DEPLOY_URL}/deployments/${deploymentId}`;
+    core.setOutput("preview-url", previewUrl);
 
-    core.info(`\n✅ Deployment completed successfully`);
+    core.info(`\n✅ Build queued successfully`);
     core.info(`🆔 Deployment ID: ${deploymentId}`);
+    core.info(`🔗 Job ID: ${jobId}`);
     core.info(`⏱️ Total time: ${totalTime}s`);
-    core.info(`📊 Circuits processed: ${circuitFiles.length}`);
-
-    if (previewUrl) {
-      core.info(`\n🔗 Preview URL: ${previewUrl}`);
-    }
+    core.info(`🔗 Preview URL: ${previewUrl}`);
+    
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
@@ -217,47 +195,56 @@ async function run(): Promise<void> {
   }
 }
 
-async function runTscircuitBuild(
-  inputs: z.infer<typeof InputSchema>,
-  circuitFiles: string[],
-): Promise<{ buildTime: number; snapshotResult: SnapshotResult }> {
+async function waitForBuildCompletion(
+  serverUrl: string,
+  token: string,
+  jobId: string
+): Promise<void> {
+  core.info("⏳ Monitoring build progress...");
+  
+  const maxWaitTime = 20 * 60 * 1000;
   const startTime = Date.now();
-  core.info("⏱️ Build start time recorded.");
+  const pollInterval = 10000;
 
-  core.info("🔨 Running tscircuit build and snapshot generation...");
-  core.info(
-    `📋 Processing ${circuitFiles.length} circuit file(s): ${circuitFiles.join(", ")}`,
-  );
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const response = await ky.get(`${serverUrl}/api/build-status?jobId=${jobId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        throwHttpErrors: false,
+      });
 
-  try {
-    core.info("🔍 Generating snapshot...");
-    const snapshotResult = await snapshotProject(inputs.workingDirectory);
-    core.info("✅ Snapshot generated.");
+      if (response.ok) {
+        const result = (await response.json()) as any;
+        const status: BuildStatus = result;
 
-    if (!snapshotResult.success) {
-      core.error("❌ Snapshot generation failed.");
-      throw new Error(
-        `Snapshot generation failed: ${snapshotResult.error || "Unknown error"}`,
-      );
+        core.info(`📊 Build status: ${status.status} (${status.progress}%)`);
+        if (status.message) {
+          core.info(`💬 ${status.message}`);
+        }
+
+        if (status.status === "completed") {
+          core.info("✅ Build completed successfully!");
+          return;
+        }
+
+        if (status.status === "failed") {
+          throw new Error(`Build failed: ${status.errorMessage || "Unknown error"}`);
+        }
+
+        if (status.status === "cancelled") {
+          throw new Error("Build was cancelled");
+        }
+      }
+    } catch (error) {
+      core.warning(`Failed to check build status: ${error}`);
     }
 
-    core.info(`✅ Snapshot generation completed:`);
-    core.info(
-      `   • Circuit files found: ${snapshotResult.circuitFiles.length}`,
-    );
-    core.info(`   • Build time: ${snapshotResult.buildTime}s`);
-
-    const buildTime = Math.round((Date.now() - startTime) / 1000);
-    core.info(`⏱️ Build time: ${buildTime}s`);
-
-    return { buildTime, snapshotResult };
-  } catch (error) {
-    const buildTime = Math.round((Date.now() - startTime) / 1000);
-    core.error(`❌ Build failed after ${buildTime}s`);
-    throw new Error(
-      `tscircuit build failed: ${error instanceof Error ? error.message : error}`,
-    );
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
+
+  core.warning("⚠️ Build monitoring timed out after 20 minutes");
 }
 
 run();
