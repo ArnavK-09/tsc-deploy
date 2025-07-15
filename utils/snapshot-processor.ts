@@ -20,7 +20,10 @@ export class SnapshotProcessor {
   private workingDirectory: string;
   private onProgress?: (progress: BuildProgress) => void;
 
-  constructor(workingDirectory: string, onProgress?: (progress: BuildProgress) => void) {
+  constructor(
+    workingDirectory: string,
+    onProgress?: (progress: BuildProgress) => void,
+  ) {
     this.workingDirectory = workingDirectory;
     this.onProgress = onProgress;
   }
@@ -43,7 +46,7 @@ export class SnapshotProcessor {
     try {
       const { stdout } = await execAsync(
         'find . -name "*.circuit.tsx" -o -name "*.circuit.ts" -o -name "*.board.tsx"',
-        { cwd: this.workingDirectory }
+        { cwd: this.workingDirectory },
       );
 
       const foundFiles = stdout
@@ -53,9 +56,11 @@ export class SnapshotProcessor {
       files.push(...foundFiles);
     } catch (error) {
       console.warn(`Failed to find circuit files with find command: ${error}`);
-      
+
       try {
-        const manualFiles = await this.findCircuitFilesManually(this.workingDirectory);
+        const manualFiles = await this.findCircuitFilesManually(
+          this.workingDirectory,
+        );
         files.push(...manualFiles);
       } catch (fallbackError) {
         console.warn(`Manual file search also failed: ${fallbackError}`);
@@ -66,7 +71,10 @@ export class SnapshotProcessor {
     return files;
   }
 
-  private async findCircuitFilesManually(dir: string, files: string[] = []): Promise<string[]> {
+  private async findCircuitFilesManually(
+    dir: string,
+    files: string[] = [],
+  ): Promise<string[]> {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -97,7 +105,11 @@ export class SnapshotProcessor {
   }
 
   private async generateCircuitJson(filePath: string): Promise<any> {
-    this.updateProgress("processing", 0, `Generating circuit JSON for ${filePath}`);
+    this.updateProgress(
+      "processing",
+      0,
+      `Generating circuit JSON for ${filePath}`,
+    );
 
     try {
       const absoluteFilePath = path.resolve(this.workingDirectory, filePath);
@@ -121,7 +133,11 @@ export class SnapshotProcessor {
 
       this.readProjectFiles(projectDir, projectDir, fsMap);
 
-      this.updateProgress("processing", 30, `Loaded ${Object.keys(fsMap).length} files into virtual file system`);
+      this.updateProgress(
+        "processing",
+        30,
+        `Loaded ${Object.keys(fsMap).length} files into virtual file system`,
+      );
 
       await runner.executeWithFsMap({
         fsMap,
@@ -134,18 +150,29 @@ export class SnapshotProcessor {
       this.updateProgress("processing", 80, "Extracting circuit JSON...");
       const circuitJson = await runner.getCircuitJson();
 
-      if (!circuitJson || (Array.isArray(circuitJson) && circuitJson.length === 0)) {
+      if (
+        !circuitJson ||
+        (Array.isArray(circuitJson) && circuitJson.length === 0)
+      ) {
         throw new Error("No circuit data was generated");
       }
 
-      this.updateProgress("processing", 90, "Circuit JSON generated successfully");
+      this.updateProgress(
+        "processing",
+        90,
+        "Circuit JSON generated successfully",
+      );
       return circuitJson;
     } catch (error) {
       throw new Error(`Failed to generate circuit JSON: ${error}`);
     }
   }
 
-  private readProjectFiles(dir: string, baseDir: string, fsMap: Record<string, string>) {
+  private readProjectFiles(
+    dir: string,
+    baseDir: string,
+    fsMap: Record<string, string>,
+  ) {
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -215,9 +242,9 @@ export class SnapshotProcessor {
 
     try {
       this.updateProgress("init", 5, "Starting snapshot generation...");
-      
+
       const circuitFiles = await this.findCircuitFiles();
-      
+
       if (circuitFiles.length === 0) {
         this.updateProgress("complete", 100, "No circuit files found");
         result.success = true;
@@ -230,29 +257,37 @@ export class SnapshotProcessor {
         return result;
       }
 
-      this.updateProgress("processing", 25, `Processing ${circuitFiles.length} circuit files...`);
+      this.updateProgress(
+        "processing",
+        25,
+        `Processing ${circuitFiles.length} circuit files...`,
+      );
 
       const totalFiles = circuitFiles.length;
       result.circuitFiles = await Promise.all(
         circuitFiles.map(async (file, index) => {
           const fileProgress = Math.round(((index + 1) / totalFiles) * 70) + 25;
           this.updateProgress("processing", fileProgress, `Processing ${file}`);
-          
+
           const circuitJson = await this.generateCircuitJson(file);
           const metadata = await this.getFileMetadata(file);
-          
+
           const circuitFile: CircuitFile = {
             path: file,
             name: path.basename(file),
             circuitJson,
             metadata,
           };
-          
+
           return circuitFile;
-        })
+        }),
       );
 
-      this.updateProgress("complete", 100, `Successfully processed ${circuitFiles.length} circuit files`);
+      this.updateProgress(
+        "complete",
+        100,
+        `Successfully processed ${circuitFiles.length} circuit files`,
+      );
       result.success = true;
       result.buildTime = Math.round((Date.now() - startTime) / 1000);
       result.metadata = {
@@ -263,11 +298,16 @@ export class SnapshotProcessor {
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      this.updateProgress("error", 0, `Snapshot generation failed: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      this.updateProgress(
+        "error",
+        0,
+        `Snapshot generation failed: ${errorMessage}`,
+      );
       result.error = errorMessage;
       result.buildTime = Math.round((Date.now() - startTime) / 1000);
       return result;
     }
   }
-} 
+}

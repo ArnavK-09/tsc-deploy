@@ -4,16 +4,19 @@ import { SvgGenerator } from "../../../../../../../utils/svg-generator";
 import type { SvgType } from "../../../../../../../utils/svg-generator";
 import { createErrorResponse } from "@/utils/http";
 
-export async function GET(context: { 
+export async function GET(context: {
   request: Request;
-  params: { deploymentId: string; fileIndex: string; type: string }
+  params: { deploymentId: string; fileIndex: string; type: string };
 }) {
   const { deploymentId, fileIndex, type } = context.params;
   const url = new URL(context.request.url);
-  
+
   // Validate SVG type
   if (!["pcb", "schematic", "3d"].includes(type)) {
-    return createErrorResponse("Invalid SVG type. Must be pcb, schematic, or 3d", 400);
+    return createErrorResponse(
+      "Invalid SVG type. Must be pcb, schematic, or 3d",
+      400,
+    );
   }
 
   try {
@@ -29,13 +32,20 @@ export async function GET(context: {
     }
 
     if (!deployment.snapshotResult) {
-      return createErrorResponse("No snapshot data available for this deployment", 404);
+      return createErrorResponse(
+        "No snapshot data available for this deployment",
+        404,
+      );
     }
 
     const snapshotData = deployment.snapshotResult as any;
     const fileIndexNum = parseInt(fileIndex, 10);
 
-    if (isNaN(fileIndexNum) || fileIndexNum < 0 || fileIndexNum >= snapshotData.circuitFiles.length) {
+    if (
+      isNaN(fileIndexNum) ||
+      fileIndexNum < 0 ||
+      fileIndexNum >= snapshotData.circuitFiles.length
+    ) {
       return createErrorResponse("Invalid file index", 400);
     }
 
@@ -57,7 +67,10 @@ export async function GET(context: {
     };
 
     // Generate SVG
-    const svgContent = await SvgGenerator.generateSvg(circuitFile.circuitJson, options);
+    const svgContent = await SvgGenerator.generateSvg(
+      circuitFile.circuitJson,
+      options,
+    );
 
     // Return SVG with proper headers
     return new Response(svgContent, {
@@ -69,14 +82,22 @@ export async function GET(context: {
         "X-SVG-Type": type,
       },
     });
-
   } catch (error) {
-    console.error(`Error generating ${type} SVG for deployment ${deploymentId}:`, error);
-    
+    console.error(
+      `Error generating ${type} SVG for deployment ${deploymentId}:`,
+      error,
+    );
+
     if (error instanceof Error) {
-      return createErrorResponse(`Failed to generate SVG: ${error.message}`, 500);
+      return createErrorResponse(
+        `Failed to generate SVG: ${error.message}`,
+        500,
+      );
     }
-    
-    return createErrorResponse("Internal server error while generating SVG", 500);
+
+    return createErrorResponse(
+      "Internal server error while generating SVG",
+      500,
+    );
   }
-} 
+}

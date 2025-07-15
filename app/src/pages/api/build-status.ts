@@ -26,13 +26,14 @@ export async function GET(context: { request: Request }) {
       return createErrorResponse("Job not found", 404);
     }
 
-    const queueLength = job.status === "queued" ? await jobQueue.getQueueLength() : undefined;
+    const queueLength =
+      job.status === "queued" ? await jobQueue.getQueueLength() : undefined;
 
     const buildStatus = {
       jobId: job.id,
       status: job.status,
       progress: job.progress || 0,
-      message: job.logs?.split('\n').pop()?.trim() || undefined,
+      message: job.logs?.split("\n").pop()?.trim() || undefined,
       startedAt: job.startedAt?.toISOString(),
       completedAt: job.completedAt?.toISOString(),
       errorMessage: job.errorMessage || undefined,
@@ -41,12 +42,14 @@ export async function GET(context: { request: Request }) {
     };
 
     return createSuccessResponse(buildStatus);
-
   } catch (error) {
     console.error("Error getting build status:", error);
     if (error instanceof Error) {
-      return createErrorResponse(`Failed to get build status: ${error.message}`, 500);
+      return createErrorResponse(
+        `Failed to get build status: ${error.message}`,
+        500,
+      );
     }
     return createErrorResponse("Internal server error", 500);
   }
-} 
+}

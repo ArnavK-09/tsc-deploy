@@ -12,16 +12,15 @@ export async function initializeServices(): Promise<void> {
 
     const jobQueue = JobQueue.getInstance();
     const queueLength = await jobQueue.getQueueLength();
-    
+
     console.log(`📊 Found ${queueLength} jobs in queue`);
-    
+
     if (queueLength > 0) {
       console.log("🔄 Resuming job processing...");
     }
 
     console.log("✅ Services initialized successfully");
     isInitialized = true;
-
   } catch (error) {
     console.error("❌ Failed to initialize services:", error);
     throw error;
@@ -30,4 +29,4 @@ export async function initializeServices(): Promise<void> {
 
 export function getInitializationStatus(): boolean {
   return isInitialized;
-} 
+}

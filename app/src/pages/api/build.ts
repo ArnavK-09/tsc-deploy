@@ -12,7 +12,7 @@ import { initializeServices } from "../../../../utils/startup";
 
 export async function POST(context: { request: Request }) {
   await initializeServices();
-  
+
   const request = context.request;
   const token = extractGitHubToken(request);
 
@@ -79,7 +79,6 @@ export async function POST(context: { request: Request }) {
       queuePosition: queueLength,
       message: "Build queued successfully",
     });
-
   } catch (error) {
     console.error("Error processing build request:", error);
     if (error instanceof Error) {
@@ -87,4 +86,4 @@ export async function POST(context: { request: Request }) {
     }
     return createErrorResponse("Internal server error", 500);
   }
-} 
+}

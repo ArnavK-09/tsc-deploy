@@ -16,9 +16,12 @@ export interface SvgGenerationOptions {
 export class SvgGenerator {
   static async generateSvg(
     circuitJson: any,
-    options: SvgGenerationOptions
+    options: SvgGenerationOptions,
   ): Promise<string> {
-    if (!circuitJson || (Array.isArray(circuitJson) && circuitJson.length === 0)) {
+    if (
+      !circuitJson ||
+      (Array.isArray(circuitJson) && circuitJson.length === 0)
+    ) {
       throw new Error("No circuit data provided");
     }
 
@@ -41,7 +44,11 @@ export class SvgGenerator {
 
       // Apply custom dimensions if provided
       if (options.width || options.height) {
-        svgContent = this.applySvgDimensions(svgContent, options.width, options.height);
+        svgContent = this.applySvgDimensions(
+          svgContent,
+          options.width,
+          options.height,
+        );
       }
 
       // Apply theme if provided
@@ -73,7 +80,9 @@ export class SvgGenerator {
     }
 
     try {
-      results.schematic = await this.generateSvg(circuitJson, { type: "schematic" });
+      results.schematic = await this.generateSvg(circuitJson, {
+        type: "schematic",
+      });
     } catch (error) {
       console.warn("Failed to generate schematic SVG:", error);
     }
@@ -90,7 +99,7 @@ export class SvgGenerator {
   private static applySvgDimensions(
     svgContent: string,
     width?: number,
-    height?: number
+    height?: number,
   ): string {
     if (!width && !height) return svgContent;
 
@@ -100,22 +109,25 @@ export class SvgGenerator {
 
     if (width) {
       svgTag = svgTag.replace(/width="[^"]*"/, `width="${width}"`);
-      if (!svgTag.includes('width=')) {
-        svgTag = svgTag.replace('<svg', `<svg width="${width}"`);
+      if (!svgTag.includes("width=")) {
+        svgTag = svgTag.replace("<svg", `<svg width="${width}"`);
       }
     }
 
     if (height) {
       svgTag = svgTag.replace(/height="[^"]*"/, `height="${height}"`);
-      if (!svgTag.includes('height=')) {
-        svgTag = svgTag.replace('<svg', `<svg height="${height}"`);
+      if (!svgTag.includes("height=")) {
+        svgTag = svgTag.replace("<svg", `<svg height="${height}"`);
       }
     }
 
     return svgContent.replace(/<svg[^>]*>/, svgTag);
   }
 
-  private static applySvgTheme(svgContent: string, theme: "light" | "dark"): string {
+  private static applySvgTheme(
+    svgContent: string,
+    theme: "light" | "dark",
+  ): string {
     if (theme === "dark") {
       // Apply dark theme transformations
       svgContent = svgContent.replace(/fill="white"/g, 'fill="#1a1a1a"');
@@ -130,7 +142,7 @@ export class SvgGenerator {
     circuitJson: any,
     type: SvgType = "pcb",
     maxWidth: number = 400,
-    maxHeight: number = 300
+    maxHeight: number = 300,
   ): Promise<string> {
     return this.generateSvg(circuitJson, {
       type,
@@ -142,17 +154,18 @@ export class SvgGenerator {
   static validateCircuitJson(circuitJson: any): boolean {
     if (!circuitJson) return false;
     if (Array.isArray(circuitJson) && circuitJson.length === 0) return false;
-    
+
     // Basic validation - check if it has the structure of a circuit JSON
     if (Array.isArray(circuitJson)) {
-      return circuitJson.some(item => 
-        item && 
-        typeof item === 'object' && 
-        (item.type || item.ftype || item.component_id)
+      return circuitJson.some(
+        (item) =>
+          item &&
+          typeof item === "object" &&
+          (item.type || item.ftype || item.component_id),
       );
     }
 
-    return typeof circuitJson === 'object' && circuitJson !== null;
+    return typeof circuitJson === "object" && circuitJson !== null;
   }
 
   static getEstimatedSvgSize(circuitJson: any): {
@@ -161,10 +174,10 @@ export class SvgGenerator {
   } {
     const jsonSize = JSON.stringify(circuitJson).length;
     const elementCount = Array.isArray(circuitJson) ? circuitJson.length : 1;
-    
+
     // Rough estimation based on circuit complexity
     const estimatedBytes = Math.max(jsonSize * 2, elementCount * 1000);
-    
+
     let complexity: "low" | "medium" | "high" = "low";
     if (elementCount > 100 || jsonSize > 50000) {
       complexity = "high";
@@ -174,4 +187,4 @@ export class SvgGenerator {
 
     return { estimatedBytes, complexity };
   }
-} 
+}

@@ -17,7 +17,11 @@
     "isolatedModules": true,
     "useDefineForClassFields": true,
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./app/src/*"]
+    }
   },
   "exclude": ["node_modules", "dist", "build", "sample-board"]
 }

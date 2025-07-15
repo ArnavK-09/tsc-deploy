@@ -14,7 +14,7 @@ const botOctokit = new GitHubService({
 
 export async function POST(context: { request: Request }) {
   await initializeServices();
-  
+
   const request = context.request;
   const token = extractGitHubToken(request);
 

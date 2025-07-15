@@ -11,7 +11,14 @@ export interface PRCommentData {
 }
 
 export function generatePRComment(data: PRCommentData): string {
-  const { deploymentId, previewUrl, buildTime, circuitCount, status, snapshotResult } = data;
+  const {
+    deploymentId,
+    previewUrl,
+    buildTime,
+    circuitCount,
+    status,
+    snapshotResult,
+  } = data;
 
   if (status === "error") {
     return `## ❌ tscircuit Deploy Failed
@@ -45,7 +52,7 @@ export function generatePRComment(data: PRCommentData): string {
 
   if (circuitCount > 0 && snapshotResult.circuitFiles) {
     comment += `### 🔌 Circuit Files\n\n`;
-    
+
     snapshotResult.circuitFiles.forEach((file, index) => {
       const fileName = file.name;
       const pcbSvgUrl = `${DEPLOY_URL}/api/svg/${deploymentId}/${index}/pcb?width=300&height=200`;
@@ -65,7 +72,7 @@ export function generatePRComment(data: PRCommentData): string {
 <img src="${pcb3dSvgUrl}" alt="3D view of ${fileName}" width="300" />
 
 **📈 Circuit Complexity:** ${getCircuitComplexity(file.circuitJson)}
-**📏 File Size:** ${file.metadata?.fileSize ? formatBytes(file.metadata.fileSize) : 'Unknown'}
+**📏 File Size:** ${file.metadata?.fileSize ? formatBytes(file.metadata.fileSize) : "Unknown"}
 
 </details>
 
@@ -98,11 +105,11 @@ export function generatePRComment(data: PRCommentData): string {
 
 function getCircuitComplexity(circuitJson: any): string {
   if (!circuitJson) return "Unknown";
-  
+
   let elementCount = 0;
   if (Array.isArray(circuitJson)) {
     elementCount = circuitJson.length;
-  } else if (typeof circuitJson === 'object') {
+  } else if (typeof circuitJson === "object") {
     elementCount = 1;
   }
 
@@ -112,13 +119,13 @@ function getCircuitComplexity(circuitJson: any): string {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
+  if (bytes === 0) return "0 Bytes";
 
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
 export function generateSuccessComment(data: {
@@ -154,8 +161,8 @@ export function generateQueuedComment(data: {
   deploymentId: string;
   queuePosition?: number;
 }): string {
-  const positionText = data.queuePosition 
-    ? `Position in queue: ${data.queuePosition}` 
+  const positionText = data.queuePosition
+    ? `Position in queue: ${data.queuePosition}`
     : "Queued for processing";
 
   return `## 🔄 tscircuit Deploy Queued

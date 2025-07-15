@@ -7,7 +7,10 @@ export async function GET(context: { request: Request }) {
   try {
     const url = new URL(context.request.url);
     const page = parseInt(url.searchParams.get("page") || "1", 10);
-    const limit = Math.min(parseInt(url.searchParams.get("limit") || "20", 10), 100);
+    const limit = Math.min(
+      parseInt(url.searchParams.get("limit") || "20", 10),
+      100,
+    );
     const owner = url.searchParams.get("owner");
     const repo = url.searchParams.get("repo");
     const status = url.searchParams.get("status");
@@ -64,20 +67,22 @@ export async function GET(context: { request: Request }) {
       .offset((page - 1) * limit);
 
     // Transform to view format
-    const deploymentViews: DeploymentView[] = allDeployments.map(deployment => ({
-      id: deployment.id,
-      owner: deployment.owner,
-      repo: deployment.repo,
-      commitSha: deployment.commitSha,
-      status: deployment.status || "pending",
-      metaType: deployment.metaType,
-      meta: deployment.meta,
-      buildDuration: deployment.buildDuration,
-      totalCircuitFiles: deployment.totalCircuitFiles || 0,
-      createdAt: deployment.createdAt.toISOString(),
-      buildCompletedAt: deployment.buildCompletedAt?.toISOString() || null,
-      errorMessage: deployment.errorMessage,
-    }));
+    const deploymentViews: DeploymentView[] = allDeployments.map(
+      (deployment) => ({
+        id: deployment.id,
+        owner: deployment.owner,
+        repo: deployment.repo,
+        commitSha: deployment.commitSha,
+        status: deployment.status || "pending",
+        metaType: deployment.metaType,
+        meta: deployment.meta,
+        buildDuration: deployment.buildDuration,
+        totalCircuitFiles: deployment.totalCircuitFiles || 0,
+        createdAt: deployment.createdAt.toISOString(),
+        buildCompletedAt: deployment.buildCompletedAt?.toISOString() || null,
+        errorMessage: deployment.errorMessage,
+      }),
+    );
 
     // Get total count for pagination
     const [{ count: totalCount }] = await db
@@ -105,11 +110,13 @@ export async function GET(context: { request: Request }) {
         status,
       },
     });
-
   } catch (error) {
     console.error("Error fetching deployments:", error);
     if (error instanceof Error) {
-      return createErrorResponse(`Failed to fetch deployments: ${error.message}`, 500);
+      return createErrorResponse(
+        `Failed to fetch deployments: ${error.message}`,
+        500,
+      );
     }
     return createErrorResponse("Internal server error", 500);
   }

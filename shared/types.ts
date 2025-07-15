@@ -4,11 +4,13 @@ export const CircuitFileSchema = z.object({
   path: z.string(),
   name: z.string(),
   circuitJson: z.any(), // Store the actual circuit JSON
-  metadata: z.object({
-    fileSize: z.number(),
-    lastModified: z.string(),
-    checksum: z.string(),
-  }).optional(),
+  metadata: z
+    .object({
+      fileSize: z.number(),
+      lastModified: z.string(),
+      checksum: z.string(),
+    })
+    .optional(),
 });
 
 export const SnapshotResultSchema = z.object({
@@ -16,11 +18,13 @@ export const SnapshotResultSchema = z.object({
   buildTime: z.number(),
   success: z.boolean(),
   error: z.string().optional(),
-  metadata: z.object({
-    totalFiles: z.number(),
-    repositorySize: z.number(),
-    buildEnvironment: z.string(),
-  }).optional(),
+  metadata: z
+    .object({
+      totalFiles: z.number(),
+      repositorySize: z.number(),
+      buildEnvironment: z.string(),
+    })
+    .optional(),
 });
 
 export type CircuitFile = z.infer<typeof CircuitFileSchema>;

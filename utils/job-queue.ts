@@ -42,7 +42,10 @@ export class JobQueue {
     return JobQueue.instance;
   }
 
-  async queueBuild(jobData: BuildJobData, priority: number = 0): Promise<string> {
+  async queueBuild(
+    jobData: BuildJobData,
+    priority: number = 0,
+  ): Promise<string> {
     const newJob: NewBuildJob = {
       deploymentId: jobData.deploymentId,
       status: "queued",
@@ -51,9 +54,9 @@ export class JobQueue {
     };
 
     const [job] = await db.insert(buildJobs).values(newJob).returning();
-    
+
     this.startProcessing();
-    
+
     return job.id;
   }
 
@@ -83,7 +86,7 @@ export class JobQueue {
 
     this.isProcessing = true;
     this.processingPromise = this.processJobs();
-    
+
     try {
       await this.processingPromise;
     } finally {
@@ -95,9 +98,9 @@ export class JobQueue {
   private async processJobs() {
     while (true) {
       const nextJob = await this.getNextJob();
-      
+
       if (!nextJob) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 5000));
         continue;
       }
 
@@ -132,13 +135,23 @@ export class JobQueue {
     let workingDirectory: string | null = null;
 
     try {
-      console.log(`Processing job ${job.id} for deployment ${jobData.deploymentId}`);
+      console.log(
+        `Processing job ${job.id} for deployment ${jobData.deploymentId}`,
+      );
 
-      await this.updateJobProgress(job.id, 5, "Initializing build environment...");
+      await this.updateJobProgress(
+        job.id,
+        5,
+        "Initializing build environment...",
+      );
 
       workingDirectory = await this.downloadRepository(jobData);
-      
-      await this.updateJobProgress(job.id, 20, "Repository downloaded, starting build...");
+
+      await this.updateJobProgress(
+        job.id,
+        20,
+        "Repository downloaded, starting build...",
+      );
 
       const snapshot = await this.buildProject(job.id, workingDirectory);
 
@@ -156,9 +169,9 @@ export class JobQueue {
         .where(eq(buildJobs.id, job.id));
 
       console.log(`Job ${job.id} completed successfully`);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error(`Job ${job.id} failed:`, error);
 
       await db
@@ -172,7 +185,9 @@ export class JobQueue {
         .where(eq(buildJobs.id, job.id));
 
       if (job.retryCount < job.maxRetries) {
-        console.log(`Retrying job ${job.id} (attempt ${job.retryCount + 1}/${job.maxRetries})`);
+        console.log(
+          `Retrying job ${job.id} (attempt ${job.retryCount + 1}/${job.maxRetries})`,
+        );
         await db
           .update(buildJobs)
           .set({
@@ -195,7 +210,7 @@ export class JobQueue {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const workDir = path.join("/tmp", `build-${jobData.deploymentId}`);
-    
+
     fs.mkdirSync(workDir, { recursive: true });
 
     // On Vercel, prioritize archive download since git may not be available
@@ -205,14 +220,16 @@ export class JobQueue {
         return workDir;
       } catch (error) {
         console.warn("Archive download failed:", error);
-        
+
         // If archive fails, try alternative methods
         try {
           await this.downloadWithFetch(jobData, workDir);
           return workDir;
         } catch (fetchError) {
           console.warn("Fetch download failed:", fetchError);
-          throw new Error(`Failed to download repository: ${error}. Archive URL may be invalid or repository may be private.`);
+          throw new Error(
+            `Failed to download repository: ${error}. Archive URL may be invalid or repository may be private.`,
+          );
         }
       }
     } else {
@@ -221,40 +238,50 @@ export class JobQueue {
         await this.downloadWithFetch(jobData, workDir);
         return workDir;
       } catch (error) {
-        throw new Error(`No archive URL provided and fetch failed: ${error}. Please ensure the repository is accessible.`);
+        throw new Error(
+          `No archive URL provided and fetch failed: ${error}. Please ensure the repository is accessible.`,
+        );
       }
     }
   }
 
-  private async downloadAndExtractArchive(jobData: BuildJobData, workDir: string): Promise<void> {
+  private async downloadAndExtractArchive(
+    jobData: BuildJobData,
+    workDir: string,
+  ): Promise<void> {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const { FileHandler } = await import("./file-handler");
-    
-    const archivePath = path.join("/tmp", `archive-${jobData.deploymentId}.tar.gz`);
-    
+
+    const archivePath = path.join(
+      "/tmp",
+      `archive-${jobData.deploymentId}.tar.gz`,
+    );
+
     // Use Node.js fetch instead of curl for better Vercel compatibility
     const response = await fetch(jobData.repoArchiveUrl!, {
       headers: {
-        'Authorization': `token ${jobData.githubToken}`,
-        'User-Agent': 'tscircuit-deploy/1.0.0',
+        Authorization: `token ${jobData.githubToken}`,
+        "User-Agent": "tscircuit-deploy/1.0.0",
       },
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to download archive: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to download archive: ${response.status} ${response.statusText}`,
+      );
     }
-    
+
     const buffer = await response.arrayBuffer();
     fs.writeFileSync(archivePath, Buffer.from(buffer));
-    
+
     const isValidSize = await FileHandler.validateFileSize(archivePath);
     if (!isValidSize) {
       throw new Error("Repository archive exceeds maximum file size limit");
     }
-    
+
     await FileHandler.extractArchive(archivePath, workDir);
-    
+
     // Handle GitHub archive structure (removes the top-level directory)
     const extractedDirs = fs.readdirSync(workDir);
     if (extractedDirs.length === 1) {
@@ -264,50 +291,64 @@ export class JobQueue {
       fs.rmSync(workDir, { recursive: true });
       fs.renameSync(tempDir, workDir);
     }
-    
+
     await FileHandler.cleanup([archivePath]);
   }
 
-  private async downloadWithFetch(jobData: BuildJobData, workDir: string): Promise<void> {
+  private async downloadWithFetch(
+    jobData: BuildJobData,
+    workDir: string,
+  ): Promise<void> {
     // This is a simpler fallback that downloads the archive directly
     const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/archive/${jobData.ref}.tar.gz`;
-    
+
     const response = await fetch(archiveUrl, {
       headers: {
-        'Authorization': `token ${jobData.githubToken}`,
-        'User-Agent': 'tscircuit-deploy/1.0.0',
+        Authorization: `token ${jobData.githubToken}`,
+        "User-Agent": "tscircuit-deploy/1.0.0",
       },
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to download repository: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to download repository: ${response.status} ${response.statusText}`,
+      );
     }
-    
-    await this.downloadAndExtractArchive({
-      ...jobData,
-      repoArchiveUrl: archiveUrl,
-    }, workDir);
+
+    await this.downloadAndExtractArchive(
+      {
+        ...jobData,
+        repoArchiveUrl: archiveUrl,
+      },
+      workDir,
+    );
   }
-
-
 
   private async buildProject(jobId: string, workingDirectory: string) {
     const processor = new SnapshotProcessor(
       workingDirectory,
       (progress: BuildProgress) => {
-        const overallProgress = Math.round((progress.progress * 0.7) + 20);
-        this.updateJobProgress(jobId, overallProgress, progress.message).catch(console.error);
-      }
+        const overallProgress = Math.round(progress.progress * 0.7 + 20);
+        this.updateJobProgress(jobId, overallProgress, progress.message).catch(
+          console.error,
+        );
+      },
     );
 
     return await processor.generateSnapshot();
   }
 
-  private async finalizeBuild(job: BuildJob, jobData: BuildJobData, snapshot: any) {
+  private async finalizeBuild(
+    job: BuildJob,
+    jobData: BuildJobData,
+    snapshot: any,
+  ) {
     const userOctokit = new GitHubService({ token: jobData.githubToken });
     const botOctokit = new GitHubService({ token: env.GITHUB_BOT_TOKEN });
 
-    const totalTime = Math.round((Date.now() - new Date(job.startedAt!).getTime()) / 1000);
+    const totalTime = Math.round(
+      (Date.now() - new Date(job.startedAt!).getTime()) / 1000,
+    );
 
     // Update deployment in database
     await db
@@ -354,7 +395,9 @@ export class JobQueue {
             body: prComment,
           });
 
-          console.log(`PR comment posted for deployment ${jobData.deploymentId}`);
+          console.log(
+            `PR comment posted for deployment ${jobData.deploymentId}`,
+          );
         } catch (error) {
           console.error("Failed to post PR comment:", error);
         }
@@ -377,7 +420,9 @@ export class JobQueue {
             },
           });
 
-          console.log(`Check run updated for deployment ${jobData.deploymentId}`);
+          console.log(
+            `Check run updated for deployment ${jobData.deploymentId}`,
+          );
         } catch (error) {
           console.error("Failed to update check run:", error);
         }
@@ -416,7 +461,9 @@ export class JobQueue {
                 sha: tagSha,
               });
 
-              console.log(`Release v${packageVersion} created for deployment ${jobData.deploymentId}`);
+              console.log(
+                `Release v${packageVersion} created for deployment ${jobData.deploymentId}`,
+              );
             }
           }
         } catch (error) {
@@ -426,7 +473,11 @@ export class JobQueue {
     }
   }
 
-  private async handleJobFailure(job: BuildJob, jobData: BuildJobData, errorMessage: string) {
+  private async handleJobFailure(
+    job: BuildJob,
+    jobData: BuildJobData,
+    errorMessage: string,
+  ) {
     const userOctokit = new GitHubService({ token: jobData.githubToken });
     const botOctokit = new GitHubService({ token: env.GITHUB_BOT_TOKEN });
 
@@ -470,7 +521,9 @@ Please check your circuit files and try again.
           body: failureComment,
         });
 
-        console.log(`Failure comment posted for deployment ${jobData.deploymentId}`);
+        console.log(
+          `Failure comment posted for deployment ${jobData.deploymentId}`,
+        );
       } catch (error) {
         console.error("Failed to post failure comment:", error);
       }
@@ -491,14 +544,20 @@ Please check your circuit files and try again.
           },
         });
 
-        console.log(`Check run updated with failure for deployment ${jobData.deploymentId}`);
+        console.log(
+          `Check run updated with failure for deployment ${jobData.deploymentId}`,
+        );
       } catch (error) {
         console.error("Failed to update check run with failure:", error);
       }
     }
   }
 
-  private async updateJobProgress(jobId: string, progress: number, message: string) {
+  private async updateJobProgress(
+    jobId: string,
+    progress: number,
+    message: string,
+  ) {
     await db
       .update(buildJobs)
       .set({
@@ -517,4 +576,4 @@ Please check your circuit files and try again.
       console.warn(`Failed to cleanup workspace ${workingDirectory}:`, error);
     }
   }
-} 
+}

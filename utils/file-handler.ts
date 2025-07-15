@@ -36,15 +36,15 @@ export class FileHandler {
     const fileName = path.basename(filePath);
     const totalSize = stats.size;
     const totalChunks = Math.ceil(totalSize / this.CHUNK_SIZE);
-    
+
     // Calculate file checksum
-    const hash = createHash('sha256');
+    const hash = createHash("sha256");
     const stream = fs.createReadStream(filePath);
-    
+
     return new Promise((resolve, reject) => {
-      stream.on('data', (data) => hash.update(data));
-      stream.on('end', () => {
-        const checksum = hash.digest('hex');
+      stream.on("data", (data) => hash.update(data));
+      stream.on("end", () => {
+        const checksum = hash.digest("hex");
         resolve({
           fileName,
           totalSize,
@@ -52,23 +52,29 @@ export class FileHandler {
           checksum,
         });
       });
-      stream.on('error', reject);
+      stream.on("error", reject);
     });
   }
 
-  static async* chunkFile(filePath: string): AsyncGenerator<FileChunk> {
+  static async *chunkFile(filePath: string): AsyncGenerator<FileChunk> {
     const metadata = await this.getFileMetadata(filePath);
-    const fileDescriptor = fs.openSync(filePath, 'r');
-    
+    const fileDescriptor = fs.openSync(filePath, "r");
+
     try {
       for (let i = 0; i < metadata.totalChunks; i++) {
         const buffer = Buffer.alloc(this.CHUNK_SIZE);
         const position = i * this.CHUNK_SIZE;
-        const bytesRead = fs.readSync(fileDescriptor, buffer, 0, this.CHUNK_SIZE, position);
-        
+        const bytesRead = fs.readSync(
+          fileDescriptor,
+          buffer,
+          0,
+          this.CHUNK_SIZE,
+          position,
+        );
+
         const chunkData = buffer.subarray(0, bytesRead);
-        const chunkHash = createHash('sha256').update(chunkData).digest('hex');
-        
+        const chunkHash = createHash("sha256").update(chunkData).digest("hex");
+
         yield {
           id: `${metadata.checksum}_${i}`,
           index: i,
@@ -82,7 +88,10 @@ export class FileHandler {
     }
   }
 
-  static async assembleFile(chunks: FileChunk[], outputPath: string): Promise<boolean> {
+  static async assembleFile(
+    chunks: FileChunk[],
+    outputPath: string,
+  ): Promise<boolean> {
     if (chunks.length === 0) return false;
 
     // Sort chunks by index
@@ -91,12 +100,16 @@ export class FileHandler {
     // Validate chunk sequence
     const expectedTotalChunks = chunks[0].totalChunks;
     if (chunks.length !== expectedTotalChunks) {
-      throw new Error(`Missing chunks: expected ${expectedTotalChunks}, got ${chunks.length}`);
+      throw new Error(
+        `Missing chunks: expected ${expectedTotalChunks}, got ${chunks.length}`,
+      );
     }
 
     for (let i = 0; i < chunks.length; i++) {
       if (chunks[i].index !== i) {
-        throw new Error(`Chunk sequence error: expected index ${i}, got ${chunks[i].index}`);
+        throw new Error(
+          `Chunk sequence error: expected index ${i}, got ${chunks[i].index}`,
+        );
       }
     }
 
@@ -106,46 +119,52 @@ export class FileHandler {
 
     // Write chunks to file
     const writeStream = fs.createWriteStream(outputPath);
-    
+
     return new Promise((resolve, reject) => {
       let currentIndex = 0;
-      
+
       const writeNextChunk = () => {
         if (currentIndex >= chunks.length) {
           writeStream.end();
           return;
         }
-        
+
         const chunk = chunks[currentIndex];
         writeStream.write(chunk.data, (error) => {
           if (error) {
             reject(error);
             return;
           }
-          
+
           currentIndex++;
           writeNextChunk();
         });
       };
-      
-      writeStream.on('finish', () => resolve(true));
-      writeStream.on('error', reject);
-      
+
+      writeStream.on("finish", () => resolve(true));
+      writeStream.on("error", reject);
+
       writeNextChunk();
     });
   }
 
-  static async compressDirectory(dirPath: string, outputPath: string): Promise<void> {
+  static async compressDirectory(
+    dirPath: string,
+    outputPath: string,
+  ): Promise<void> {
     try {
       // Try using Node.js tar package if available
       const tar = await import("tar").catch(() => null);
-      
+
       if (tar) {
-        await tar.create({
-          file: outputPath,
-          gzip: true,
-          cwd: path.dirname(dirPath),
-        }, [path.basename(dirPath)]);
+        await tar.create(
+          {
+            file: outputPath,
+            gzip: true,
+            cwd: path.dirname(dirPath),
+          },
+          [path.basename(dirPath)],
+        );
       } else {
         // Fallback to shell command
         const { exec } = await import("node:child_process");
@@ -160,11 +179,14 @@ export class FileHandler {
     }
   }
 
-  static async extractArchive(archivePath: string, outputDir: string): Promise<void> {
+  static async extractArchive(
+    archivePath: string,
+    outputDir: string,
+  ): Promise<void> {
     try {
       // Try using Node.js built-in tar extraction if available
       const tar = await import("tar").catch(() => null);
-      
+
       if (tar) {
         // Use tar package for extraction
         await tar.extract({
@@ -179,7 +201,7 @@ export class FileHandler {
         const execAsync = promisify(exec);
 
         fs.mkdirSync(outputDir, { recursive: true });
-        
+
         const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
         await execAsync(extractCommand);
       }
@@ -210,23 +232,26 @@ export class FileHandler {
     }
   }
 
-  static async createSymbolicLink(target: string, linkPath: string): Promise<void> {
+  static async createSymbolicLink(
+    target: string,
+    linkPath: string,
+  ): Promise<void> {
     const linkDir = path.dirname(linkPath);
     fs.mkdirSync(linkDir, { recursive: true });
-    
+
     if (fs.existsSync(linkPath)) {
       fs.unlinkSync(linkPath);
     }
-    
+
     fs.symlinkSync(target, linkPath);
   }
 
   static async getDirectorySize(dirPath: string): Promise<number> {
     let totalSize = 0;
-    
+
     const getSize = (currentPath: string) => {
       const stats = fs.statSync(currentPath);
-      
+
       if (stats.isDirectory()) {
         const files = fs.readdirSync(currentPath);
         for (const file of files) {
@@ -236,8 +261,8 @@ export class FileHandler {
         totalSize += stats.size;
       }
     };
-    
+
     getSize(dirPath);
     return totalSize;
   }
-} 
+}

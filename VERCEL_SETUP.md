@@ -13,11 +13,12 @@ This guide explains how to deploy the tscircuit-deploy system on Vercel.
 Set these in your Vercel project settings:
 
 ### Required Variables
+
 ```bash
 # Database
 DATABASE_URL="postgresql://username:password@host:port/database"
 
-# GitHub Integration  
+# GitHub Integration
 GITHUB_BOT_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
 DEPLOY_URL="https://your-project.vercel.app"
 
@@ -37,7 +38,7 @@ Ensure these dependencies are included for Vercel compatibility:
     "@vercel/postgres": "^0.10.0",
     "drizzle-orm": "^0.44.3",
     "circuit-to-svg": "^0.0.166",
-    "circuit-json-to-simple-3d": "^0.0.4", 
+    "circuit-json-to-simple-3d": "^0.0.4",
     "tscircuit": "^0.0.534"
   }
 }
@@ -69,13 +70,16 @@ Create `vercel.json` in your project root:
 ## Database Setup
 
 ### Option 1: Vercel Postgres
+
 1. Go to your Vercel dashboard
 2. Navigate to Storage tab
 3. Create a new Postgres database
 4. Copy the connection string to `DATABASE_URL`
 
 ### Option 2: External Provider
+
 Use services like:
+
 - **Neon** (recommended) - serverless Postgres
 - **PlanetScale** - serverless MySQL (requires schema changes)
 - **Supabase** - managed Postgres
@@ -101,11 +105,12 @@ Use services like:
 ## Deployment Steps
 
 ### 1. Deploy to Vercel
+
 ```bash
 # Install Vercel CLI
 npm i -g vercel
 
-# Login to Vercel  
+# Login to Vercel
 vercel login
 
 # Deploy
@@ -113,10 +118,11 @@ vercel --prod
 ```
 
 ### 2. Set Environment Variables
+
 ```bash
 # Set required variables
 vercel env add DATABASE_URL
-vercel env add GITHUB_BOT_TOKEN  
+vercel env add GITHUB_BOT_TOKEN
 vercel env add DEPLOY_URL
 
 # Redeploy with new variables
@@ -124,6 +130,7 @@ vercel --prod
 ```
 
 ### 3. Database Migration
+
 Run database migration after first deployment:
 
 ```sql
@@ -184,23 +191,27 @@ CREATE TYPE job_status AS ENUM ('queued', 'processing', 'completed', 'failed', '
 ## Vercel-Specific Optimizations
 
 ### 1. Function Timeout
+
 - Default: 10 seconds (Hobby), 60 seconds (Pro)
 - Our config sets 300 seconds for API routes
 - Upgrade to Pro plan for longer timeouts
 
 ### 2. Memory Limits
+
 - Default: 1GB (Hobby), 3GB (Pro)
 - Set `NODE_OPTIONS="--max-old-space-size=4096"` for larger projects
 
 ### 3. Cold Start Optimization
+
 ```typescript
 // In your API routes, use this pattern:
 export const config = {
   maxDuration: 300, // 5 minutes
-}
+};
 ```
 
 ### 4. File System Limitations
+
 - Only `/tmp` is writable
 - Files are cleaned up after function execution
 - Use efficient cleanup in job processing
@@ -208,6 +219,7 @@ export const config = {
 ## Testing Your Deployment
 
 1. **Health Check**:
+
    ```bash
    curl https://your-project.vercel.app/api/health
    ```
@@ -260,6 +272,7 @@ vercel dev
 ## Performance Optimization
 
 1. **Database Indexing**:
+
    ```sql
    CREATE INDEX idx_deployments_created_at ON deployments(created_at);
    CREATE INDEX idx_build_jobs_status ON build_jobs(status);
@@ -281,10 +294,11 @@ vercel dev
    - Monitor function performance
 
 2. **Database Monitoring**:
+
    ```sql
    -- Check queue status
    SELECT status, COUNT(*) FROM build_jobs GROUP BY status;
-   
+
    -- Monitor build times
    SELECT AVG(build_duration) FROM deployments WHERE build_duration IS NOT NULL;
    ```
@@ -331,8 +345,9 @@ vercel dev
 ## Support
 
 For deployment issues:
+
 1. Check Vercel documentation
 2. Review function logs
 3. Test locally with `vercel dev`
 4. Verify environment variables
-5. Check database connectivity 
+5. Check database connectivity

@@ -46,7 +46,9 @@ export const deployments = pgTable("deployments", {
 
 export const buildJobs = pgTable("build_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
-  deploymentId: varchar("deployment_id", { length: 36 }).references(() => deployments.id).notNull(),
+  deploymentId: varchar("deployment_id", { length: 36 })
+    .references(() => deployments.id)
+    .notNull(),
   status: jobStatus("status").default("queued").notNull(),
   priority: integer("priority").default(0).notNull(),
   startedAt: timestamp("started_at"),
@@ -64,7 +66,9 @@ export const buildJobs = pgTable("build_jobs", {
 
 export const buildArtifacts = pgTable("build_artifacts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  jobId: uuid("job_id").references(() => buildJobs.id).notNull(),
+  jobId: uuid("job_id")
+    .references(() => buildJobs.id)
+    .notNull(),
   fileName: text("file_name").notNull(),
   fileType: text("file_type").notNull(),
   filePath: text("file_path").notNull(),
