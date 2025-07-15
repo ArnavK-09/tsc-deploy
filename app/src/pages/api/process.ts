@@ -1,13 +1,11 @@
-import { DeploymentRequestSchema } from "@/utils/types";
-import { db, deployments } from "@/utils/db";
-import { GitHubService } from "@/utils/github-service";
-import { DEPLOY_URL } from "@/utils/constants";
-import { generatePRComment } from "@/utils/pr-comment";
-import { env } from "@/utils/env";
-import {
-  validateGitHubToken,
-} from "@/utils/auth";
-import { createErrorResponse , createSuccessResponse} from "@/utils/http";
+import { DeploymentRequestSchema } from "../../../../shared/types";
+import { db, deployments } from "../../../../db";
+import { GitHubService } from "../../../../shared/github.service";
+import { DEPLOY_URL } from "../../../../shared/constants";
+import { generatePRComment } from "../../../../utils/pr-comment";
+import { env } from "../../../../shared/env";
+import { validateGitHubToken } from "@/utils/auth";
+import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 
 const botOctokit = new GitHubService({
   token: env.GITHUB_BOT_TOKEN,

@@ -1,4 +1,4 @@
-import { db, deployments } from "@/utils/db";
+import { db, deployments } from "../../../../db";
 import { createSuccessResponse, createErrorResponse } from "@/utils/http";
 
 export async function GET() {

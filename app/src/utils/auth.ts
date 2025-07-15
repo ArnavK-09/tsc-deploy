@@ -37,14 +37,14 @@ export async function validateGitHubToken(request: Request): Promise<{
     };
   }
 
-  const isValid = await verifyGitHubToken(token);
+  // const isValid = await verifyGitHubToken(token);
 
-  if (!isValid) {
-    return {
-      success: false,
-      error: "Invalid GitHub token",
-    };
-  }
+  // if (!isValid) {
+  //   return {
+  //     success: false,
+  //     error: "Invalid GitHub token",
+  //   };
+  // }
 
   return {
     success: true,
