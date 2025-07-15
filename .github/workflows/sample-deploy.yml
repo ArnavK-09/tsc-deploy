@@ -1,4 +1,4 @@
-name: Simple tscircuit Deploy
+name: Sample tscircuit Deploy
 
 on:
   push:
