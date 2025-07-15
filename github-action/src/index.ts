@@ -64,6 +64,11 @@ async function run(): Promise<void> {
     }
 
     core.info("🔍 Creating deployment...");
+
+    if(context.eventName == "workflow_dispatch") {
+      context.eventName = 'push'
+    }
+
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
       repo: context.repo.repo,

@@ -145,10 +145,7 @@ export class JobQueue {
         "Initializing build environment...",
       );
 
-      workingDirectory = await this.downloadRepository(jobData).catch(e => {
-        this.handleJobFailure(job, jobData, e.message);
-        return null;
-      });
+      workingDirectory = await this.downloadRepository(jobData);
 
       await this.updateJobProgress(
         job.id,
