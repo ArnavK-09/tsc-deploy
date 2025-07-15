@@ -150,49 +150,44 @@ async function run(): Promise<void> {
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
       create_release:
-      context.eventName == "push" && (inputs.create_release || false),
+        context.eventName == "push" && (inputs.create_release || false),
     };
     core.info("✅ Deployment request prepared");
-    const response4  = await fetch("https://example.com")
+    const response4 = await fetch("https://example.com");
     console.log(await response4.text());
     console.log("deploymentRequest");
-    const response2 = await fetch(
-      `${inputs.deployServerUrl}/api/process`,
-      {
-        method: 'POST',
-        body: JSON.stringify({}),
-        headers: {
-          Authorization: `Bearer ${inputs.githubToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    core.info(await response2.text() +    `${inputs.deployServerUrl}/api/process`);
-    core.info("Mock sent")
-    process.exit(1);
-    const response = await ky.post(
-      `${inputs.deployServerUrl}/api/process`,
-      {
-        body: JSON.stringify(deploymentRequest),
-        headers: {
-          Authorization: `Bearer ${inputs.githubToken}`,
-        }
+    const response2 = await fetch(`${inputs.deployServerUrl}/api/process`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      headers: {
+        Authorization: `Bearer ${inputs.githubToken}`,
+        "Content-Type": "application/json",
       },
+    });
+    core.info(
+      (await response2.text()) + `${inputs.deployServerUrl}/api/process`,
     );
-
+    core.info("Mock sent");
+    process.exit(1);
+    const response = await ky.post(`${inputs.deployServerUrl}/api/process`, {
+      body: JSON.stringify(deploymentRequest),
+      headers: {
+        Authorization: `Bearer ${inputs.githubToken}`,
+      },
+    });
 
     core.info("🔍 Sending deployment request...");
     core.info("✅ Deployment request sent.");
 
-    if(!response.ok) {  
+    if (!response.ok) {
       core.error("❌ Deployment request failed.");
       console.log(response);
       console.log(await response.text());
       throw new Error(response.statusText);
     }
-    
+
     core.info("🔍 Parsing deployment response...");
-    const result = await response.json() as any;
+    const result = (await response.json()) as any;
     core.info("✅ Deployment response parsed.");
 
     if (!result.success) {
@@ -222,7 +217,7 @@ async function run(): Promise<void> {
     }
   } catch (error) {
     const errorMessage =
-    error instanceof Error ? error.message : "Unknown error";
+      error instanceof Error ? error.message : "Unknown error";
     core.error(error as Error);
     core.setFailed(`☠️ Workflow failed: ${errorMessage}`);
     process.exit(1);
