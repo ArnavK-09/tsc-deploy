@@ -152,7 +152,7 @@ async function run(): Promise<void> {
       create_release:
       context.eventName == "push" && (inputs.create_release || false),
     };
-    core.info("✅ Deployment request prepared");\
+    core.info("✅ Deployment request prepared");
     const response4  = await fetch("https://example.com")
     console.log(await response4.text());
     console.log("deploymentRequest");
