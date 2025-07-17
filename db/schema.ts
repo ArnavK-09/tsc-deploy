@@ -32,8 +32,6 @@ export const deployments = pgTable("deployments", {
   repo: text("repo").notNull(),
   commitSha: varchar("commit_sha", { length: 40 }).notNull(),
   status: deploymentStatus("status").default("pending"),
-  buildLogs: text("build_logs"),
-  errorMessage: text("error_message"),
   meta: text("meta").notNull(),
   metaType: metaType("meta_type").notNull(),
   buildCompletedAt: timestamp("build_completed_at"),
@@ -48,17 +46,14 @@ export const buildJobs = pgTable("build_jobs", {
   deploymentId: varchar("deployment_id", { length: 36 })
     .references(() => deployments.id)
     .notNull(),
-  status: jobStatus("status").default("queued").notNull(),
+  status: jobStatus("status").default("queued").notNull().default("queued"),
   priority: integer("priority").default(0).notNull(),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   retryCount: integer("retry_count").default(0).notNull(),
-  maxRetries: integer("max_retries").default(3).notNull(),
   errorMessage: text("error_message"),
-  workerNodeId: text("worker_node_id"),
   queuedAt: timestamp("queued_at").notNull().defaultNow(),
   progress: integer("progress").default(0),
-  estimatedDuration: integer("estimated_duration"),
   logs: text("logs"),
   metadata: jsonb("metadata"),
 });
@@ -66,13 +61,18 @@ export const buildJobs = pgTable("build_jobs", {
 export const buildArtifacts = pgTable("build_artifacts", {
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id")
-    .references(() => buildJobs.id)
+    .references(() => buildJobs.id, {
+      onDelete: "set null",
+    })
+    .notNull(),
+  deploymentId: varchar("deployment_id", { length: 36 })
+    .references(() => buildJobs.deploymentId, {
+      onDelete: "cascade",
+    })
     .notNull(),
   fileName: text("file_name").notNull(),
-  fileType: text("file_type").notNull(),
   filePath: text("file_path").notNull(),
   fileSize: integer("file_size"),
-  mimeType: text("mime_type"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  metadata: jsonb("metadata"),
+  circuitJson: jsonb("circuit_json"),
 });

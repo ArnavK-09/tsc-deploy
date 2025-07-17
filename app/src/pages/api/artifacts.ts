@@ -8,9 +8,7 @@ export async function GET(context: { request: Request }) {
     const deploymentId = url.searchParams.get("deploymentId");
     const jobId = url.searchParams.get("jobId");
     const artifactId = url.searchParams.get("artifactId");
-    const fileType = url.searchParams.get("fileType") || "circuit-json";
 
-    // If specific artifact ID is requested
     if (artifactId) {
       const [artifact] = await db
         .select()
@@ -25,7 +23,6 @@ export async function GET(context: { request: Request }) {
       return createSuccessResponse({ artifact });
     }
 
-    // If deployment ID is provided, find the job first
     if (deploymentId) {
       const [job] = await db
         .select({ id: buildJobs.id })
@@ -40,12 +37,7 @@ export async function GET(context: { request: Request }) {
       const artifacts = await db
         .select()
         .from(buildArtifacts)
-        .where(
-          and(
-            eq(buildArtifacts.jobId, job.id),
-            eq(buildArtifacts.fileType, fileType),
-          ),
-        );
+        .where(and(eq(buildArtifacts.jobId, job.id)));
 
       return createSuccessResponse({
         deploymentId,
@@ -55,17 +47,11 @@ export async function GET(context: { request: Request }) {
       });
     }
 
-    // If job ID is provided directly
     if (jobId) {
       const artifacts = await db
         .select()
         .from(buildArtifacts)
-        .where(
-          and(
-            eq(buildArtifacts.jobId, jobId),
-            eq(buildArtifacts.fileType, fileType),
-          ),
-        );
+        .where(and(eq(buildArtifacts.jobId, jobId)));
 
       return createSuccessResponse({
         jobId,

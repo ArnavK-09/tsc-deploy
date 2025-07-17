@@ -11,7 +11,6 @@ export async function GET(context: {
   const { deploymentId, fileIndex, type } = context.params;
   const url = new URL(context.request.url);
 
-  // Validate SVG type
   if (!["pcb", "schematic", "3d"].includes(type)) {
     return createErrorResponse(
       "Invalid SVG type. Must be pcb, schematic, or 3d",
@@ -20,7 +19,6 @@ export async function GET(context: {
   }
 
   try {
-    // Get deployment from database
     const [deployment] = await db
       .select()
       .from(deployments)
@@ -54,7 +52,6 @@ export async function GET(context: {
       return createErrorResponse("Circuit JSON not found for this file", 404);
     }
 
-    // Parse query parameters for customization
     const width = url.searchParams.get("width");
     const height = url.searchParams.get("height");
     const theme = url.searchParams.get("theme") as "light" | "dark" | null;
@@ -66,17 +63,15 @@ export async function GET(context: {
       ...(theme && { theme }),
     };
 
-    // Generate SVG
     const svgContent = await SvgGenerator.generateSvg(
       circuitFile.circuitJson,
       options,
     );
 
-    // Return SVG with proper headers
     return new Response(svgContent, {
       headers: {
         "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=86400", // Cache for 24 hours
+        "Cache-Control": "public, max-age=86400",
         "Access-Control-Allow-Origin": "*",
         "X-Circuit-File": circuitFile.name,
         "X-SVG-Type": type,

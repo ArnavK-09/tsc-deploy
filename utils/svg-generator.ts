@@ -155,7 +155,6 @@ export class SvgGenerator {
     if (!circuitJson) return false;
     if (Array.isArray(circuitJson) && circuitJson.length === 0) return false;
 
-    // Basic validation - check if it has the structure of a circuit JSON
     if (Array.isArray(circuitJson)) {
       return circuitJson.some(
         (item) =>

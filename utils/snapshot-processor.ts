@@ -1,13 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { CircuitRunner } from "tscircuit";
 import { createHash } from "node:crypto";
 import { SnapshotResult, CircuitFile } from "../shared/types";
 import { FileHandler } from "./file-handler";
 
-const execAsync = promisify(exec);
 const ALLOWED_FILE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
 
 export interface BuildProgress {

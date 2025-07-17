@@ -1,4 +1,3 @@
-import { BuildStatusSchema } from "../../../../shared/types";
 import { JobQueue } from "../../../../utils/job-queue";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import { extractGitHubToken } from "@/utils/auth";
@@ -37,11 +36,9 @@ export async function GET(context: { request: Request }) {
       startedAt: job.startedAt?.toISOString(),
       completedAt: job.completedAt?.toISOString(),
       errorMessage: job.errorMessage || undefined,
-      estimatedDuration: job.estimatedDuration || undefined,
       queuePosition: queueLength,
     };
 
-    // If the job has failed, return error response with job details
     if (job.status === "failed") {
       return new Response(
         JSON.stringify({

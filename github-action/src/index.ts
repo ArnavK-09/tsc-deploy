@@ -10,7 +10,6 @@ import { GitHubService } from "../../shared/github.service";
 const InputSchema = z.object({
   githubToken: z.string(),
   workingDirectory: z.string().default("."),
-  deployServerUrl: z.string().default(DEPLOY_SERVER_URL).optional(),
   create_release: z.boolean().default(false).optional(),
 });
 
@@ -29,7 +28,6 @@ async function run(): Promise<void> {
     const inputs = InputSchema.parse({
       githubToken: core.getInput("github-token"),
       workingDirectory: core.getInput("working-directory"),
-      deployServerUrl: core.getInput("deploy-server-url") || DEPLOY_SERVER_URL,
       create_release: core.getInput("create-release") === "true",
     });
     core.info("✅ Inputs parsed successfully.");
@@ -56,7 +54,6 @@ async function run(): Promise<void> {
     const startTime = Date.now();
     core.info("⏱️ Start time recorded.");
 
-    // Validate that this is a supported event
     const EVENT_TYPE =
       context.eventName == "workflow_dispatch" ? "push" : context.eventName;
     if (!["push", "pull_request"].includes(EVENT_TYPE)) {
@@ -111,7 +108,6 @@ async function run(): Promise<void> {
 
     core.info("🔍 Preparing build request...");
 
-    // Create archive URL for faster download
     const archiveRef =
       EVENT_TYPE === "pull_request"
         ? context.payload.pull_request?.head.sha || context.sha
@@ -149,7 +145,7 @@ async function run(): Promise<void> {
     core.info("✅ Build request prepared");
 
     core.info("🔍 Sending build request...");
-    const serverUrl = inputs.deployServerUrl || DEPLOY_SERVER_URL;
+    const serverUrl = DEPLOY_SERVER_URL;
 
     const response = await ky.post(`${serverUrl}/api/build`, {
       body: JSON.stringify(buildRequest),
@@ -157,7 +153,7 @@ async function run(): Promise<void> {
         Authorization: `Bearer ${inputs.githubToken}`,
         "Content-Type": "application/json",
       },
-      timeout: 30000, // 30 second timeout
+      timeout: 30000,
       throwHttpErrors: false,
     });
 
@@ -188,7 +184,6 @@ async function run(): Promise<void> {
     core.info(`🆔 Job ID: ${jobId}`);
     core.info(`📍 Queue position: ${queuePosition}`);
 
-    // Monitor build progress
     const buildResult = await waitForBuildCompletion(
       serverUrl,
       inputs.githubToken,
@@ -209,7 +204,6 @@ async function run(): Promise<void> {
     const previewUrl = `${DEPLOY_URL}/deployments/${deploymentId}`;
     core.setOutput("preview-url", previewUrl);
 
-    // Create a summary for the job
     const statusEmoji = buildResult.status === "completed" ? "✅" : "❌";
     const summary = `
 ## ${statusEmoji} tscircuit Deploy ${buildResult.status === "completed" ? "Successful" : "Failed"}
@@ -238,7 +232,6 @@ ${buildResult.status === "completed" ? "🎉 Your circuits have been successfull
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
-    // Determine error type for better reporting
     let errorType = "Unknown Error";
     let troubleshooting = "Check the logs above for more details.";
 
@@ -270,7 +263,6 @@ ${buildResult.status === "completed" ? "🎉 Your circuits have been successfull
         "Check your GitHub token permissions and repository access.";
     }
 
-    // Create failure summary
     const failureSummary = `
 ## ❌ tscircuit Deploy Failed
 
@@ -304,12 +296,12 @@ async function waitForBuildCompletion(
 ): Promise<{ status: string; circuitCount?: number }> {
   core.info("⏳ Monitoring build progress...");
 
-  const maxWaitTime = 20 * 60 * 1000; // 20 minutes
+  const maxWaitTime = 20 * 60 * 1000;
   const startTime = Date.now();
-  const pollInterval = 10000; // 10 seconds
+  const pollInterval = 10000;
   let lastProgress = 0;
   let consecutiveErrors = 0;
-  const maxConsecutiveErrors = 5; // Allow up to 5 consecutive errors before failing
+  const maxConsecutiveErrors = 5;
 
   while (Date.now() - startTime < maxWaitTime) {
     try {
@@ -319,16 +311,15 @@ async function waitForBuildCompletion(
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          timeout: 15000, // Increased timeout to 15 seconds
+          timeout: 15000,
           retry: {
-            limit: 2, // Retry failed requests up to 2 times
+            limit: 2,
             methods: ["get"],
           },
           throwHttpErrors: false,
         },
       );
 
-      // Reset error counter on successful response
       consecutiveErrors = 0;
 
       if (response.ok) {
@@ -337,7 +328,6 @@ async function waitForBuildCompletion(
 
         core.info(JSON.stringify(status, null, 2));
 
-        // Only log progress updates to avoid spam
         if (status.progress !== lastProgress) {
           core.info(`📊 Build status: ${status.status} (${status.progress}%)`);
           lastProgress = status.progress;
@@ -350,7 +340,6 @@ async function waitForBuildCompletion(
         if (status.status === "completed") {
           core.info("✅ Build completed successfully!");
 
-          // Try to get circuit count from deployment
           try {
             const deploymentResponse = await ky.get(
               `${serverUrl}/api/deployments?id=${jobId}`,
@@ -401,7 +390,6 @@ async function waitForBuildCompletion(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      // Check if it's a network/connection error that we should retry
       const isNetworkError =
         errorMessage.includes("other side closed") ||
         errorMessage.includes("ECONNRESET") ||
@@ -414,18 +402,16 @@ async function waitForBuildCompletion(
           `⚠️ Network error (${consecutiveErrors}/${maxConsecutiveErrors}): ${errorMessage}`,
         );
         core.info("🔄 Retrying in 15 seconds...");
-        await new Promise((resolve) => setTimeout(resolve, 15000)); // Wait 15s before retry
+        await new Promise((resolve) => setTimeout(resolve, 15000));
         continue;
       }
 
-      // For non-network errors or after max retries, fail immediately
       if (consecutiveErrors >= maxConsecutiveErrors) {
         throw new Error(
           `Build monitoring failed after ${maxConsecutiveErrors} consecutive errors. Last error: ${errorMessage}`,
         );
       }
 
-      // For build status errors (completed, failed, cancelled), fail immediately
       if (
         errorMessage.includes("Build failed:") ||
         errorMessage.includes("Build was cancelled")

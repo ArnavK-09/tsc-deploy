@@ -10,13 +10,14 @@ import {
 } from "../db";
 import { SnapshotProcessor, BuildProgress } from "./snapshot-processor";
 import { GitHubService } from "../shared/github.service";
-import { DEPLOY_URL } from "../shared/constants";
+import { DEPLOY_URL, JOB_MAX_RETRIES } from "../shared/constants";
 import { generatePRComment } from "./pr-comment";
 import type { PRCommentData } from "./pr-comment";
 import { env } from "../shared/env";
 import fs from "node:fs";
 import path from "node:path";
 import { FileHandler } from "./file-handler";
+import { SnapshotResult } from "shared/types";
 
 export interface BuildJobData {
   deploymentId: string;
@@ -134,7 +135,6 @@ export class JobQueue {
       .set({
         status: "processing",
         startedAt: new Date(),
-        workerNodeId: process.env.HOSTNAME || "unknown",
       })
       .where(eq(buildJobs.id, job.id));
 
@@ -211,9 +211,9 @@ export class JobQueue {
         })
         .where(eq(buildJobs.id, job.id));
 
-      if (!isNonRetryable && job.retryCount < job.maxRetries) {
+      if (!isNonRetryable && job.retryCount < JOB_MAX_RETRIES) {
         console.log(
-          `Retrying job ${job.id} (attempt ${job.retryCount + 1}/${job.maxRetries})`,
+          `Retrying job ${job.id} (attempt ${job.retryCount + 1}/${JOB_MAX_RETRIES})`,
         );
 
         // Add exponential backoff delay for retries
@@ -236,7 +236,7 @@ export class JobQueue {
             `Job ${job.id} failed with non-retryable error: ${errorMessage}`,
           );
         } else {
-          console.log(`Job ${job.id} failed after ${job.maxRetries} retries`);
+          console.log(`Job ${job.id} failed after ${JOB_MAX_RETRIES} retries`);
         }
         await this.handleJobFailure(job, jobData, errorMessage);
       }
@@ -404,8 +404,8 @@ export class JobQueue {
   }
 
   private async saveBuildArtifacts(
-    jobId: string,
-    snapshot: any,
+    job: BuildJob,
+    snapshot: SnapshotResult,
   ): Promise<void> {
     try {
       if (
@@ -427,21 +427,12 @@ export class JobQueue {
           const fileSize = Buffer.byteLength(circuitJsonString, "utf8");
 
           return {
-            jobId: jobId,
+            jobId: job.id,
+            deploymentId: job.deploymentId,
             fileName: file.name || `circuit-${index}.json`,
-            fileType: "circuit-json",
-            filePath: file.path || `circuits/circuit-${index}.json`,
-            fileSize: fileSize,
-            mimeType: "application/json",
-            metadata: {
-              originalPath: file.path,
-              circuitComplexity: this.getCircuitComplexity(file.circuitJson),
-              generatedAt: new Date().toISOString(),
-              hasComponents: Array.isArray(file.circuitJson)
-                ? file.circuitJson.length > 0
-                : !!file.circuitJson,
-              fileMetadata: file.metadata || null,
-            },
+            filePath: file.path || `circuit-${index}.json`,
+            fileSize,
+            circuitJson: file.circuitJson,
           };
         },
       );
@@ -454,48 +445,14 @@ export class JobQueue {
         );
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      console.warn(
-        "⚠️ Failed to save build artifacts (continuing build):",
-        errorMessage,
-      );
-
-      // Log specific database errors for debugging
-      if (
-        errorMessage.includes("does not exist") ||
-        errorMessage.includes("buildArtifacts")
-      ) {
-        console.warn(
-          "📊 Build artifacts table may not exist - skipping artifact storage",
-        );
-      }
-
-      // Don't throw error - artifacts saving is optional and shouldn't fail the entire build
+      console.error("⚠️ Failed to save build artifacts", error);
     }
-  }
-
-  private getCircuitComplexity(circuitJson: any): string {
-    if (!circuitJson) return "empty";
-
-    let elementCount = 0;
-    if (Array.isArray(circuitJson)) {
-      elementCount = circuitJson.length;
-    } else if (typeof circuitJson === "object") {
-      elementCount = Object.keys(circuitJson).length;
-    }
-
-    if (elementCount === 0) return "empty";
-    if (elementCount <= 5) return "simple";
-    if (elementCount <= 20) return "moderate";
-    if (elementCount <= 50) return "complex";
-    return "very-complex";
   }
 
   private async finalizeBuild(
     job: BuildJob,
     jobData: BuildJobData,
-    snapshot: any,
+    snapshot: SnapshotResult,
   ) {
     console.log(`Finalizing build for job: ${job.id}`);
     const userOctokit = new GitHubService({ token: jobData.githubToken });
@@ -506,9 +463,8 @@ export class JobQueue {
     );
     console.log(`Total build time: ${totalTime}s`);
 
-    // Save circuit files as build artifacts (non-blocking)
     try {
-      await this.saveBuildArtifacts(job.id, snapshot);
+      await this.saveBuildArtifacts(job, snapshot);
     } catch (artifactError) {
       console.warn(
         "Failed to save build artifacts (non-blocking):",
@@ -527,10 +483,19 @@ export class JobQueue {
         buildDuration: totalTime,
         buildCompletedAt: new Date(),
         status: snapshot.success ? "ready" : "error",
-        errorMessage: snapshot.error || null,
         totalCircuitFiles: snapshot.circuitFiles?.length || 0,
       })
       .where(eq(deployments.id, jobData.deploymentId));
+
+    // Update job with error message if snapshot failed
+    if (!snapshot.success && snapshot.error) {
+      await db
+        .update(buildJobs)
+        .set({
+          errorMessage: snapshot.error,
+        })
+        .where(eq(buildJobs.id, job.id));
+    }
 
     if (snapshot.success) {
       console.log(
@@ -670,12 +635,10 @@ export class JobQueue {
       .update(deployments)
       .set({
         status: "error",
-        errorMessage,
         buildCompletedAt: new Date(),
       })
       .where(eq(deployments.id, jobData.deploymentId));
 
-    // Update GitHub deployment status
     await userOctokit.createDeploymentStatus({
       owner: jobData.owner,
       repo: jobData.repo,

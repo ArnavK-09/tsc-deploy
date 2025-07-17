@@ -16,11 +16,6 @@ inputs:
     required: false
     default: "."
 
-  deploy-server-url:
-    description: "URL of the tscircuit deploy server"
-    required: false
-    default: "https://deploy.tscircuit.com"
-
   create-release:
     description: "Create a release for the project"
     required: false
