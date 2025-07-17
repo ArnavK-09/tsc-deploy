@@ -62,6 +62,7 @@ export class SnapshotProcessor {
           this.workingDirectory,
         );
         files.push(...manualFiles);
+        console.log("Files found:", manualFiles)
       } catch (fallbackError) {
         console.warn(`Manual file search also failed: ${fallbackError}`);
       }

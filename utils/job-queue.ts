@@ -145,7 +145,9 @@ export class JobQueue {
         "Initializing build environment...",
       );
 
+      console.log(`Starting to download repository for job ${job.id}`);
       workingDirectory = await this.downloadRepository(jobData);
+      console.log(`Repository downloaded for job ${job.id} to ${workingDirectory}`);
 
       await this.updateJobProgress(
         job.id,
@@ -153,11 +155,15 @@ export class JobQueue {
         "Repository downloaded, starting build...",
       );
 
+      console.log(`Starting build for job ${job.id}`);
       const snapshot = await this.buildProject(job.id, workingDirectory);
+      console.log(`Build completed for job ${job.id}, snapshot created`);
 
       await this.updateJobProgress(job.id, 90, "Finalizing deployment...");
 
+      console.log(`Finalizing build for job ${job.id}`);
       await this.finalizeBuild(job, jobData, snapshot);
+      console.log(`Build finalized for job ${job.id}`);
 
       await db
         .update(buildJobs)
@@ -167,6 +173,7 @@ export class JobQueue {
           progress: 100,
         })
         .where(eq(buildJobs.id, job.id));
+      console.log(`Job ${job.id} marked as completed in database`);
 
       console.log(`Job ${job.id} completed successfully`);
     } catch (error) {
@@ -382,14 +389,17 @@ export class JobQueue {
     jobData: BuildJobData,
     snapshot: any,
   ) {
+    console.log(`Finalizing build for job: ${job.id}`);
     const userOctokit = new GitHubService({ token: jobData.githubToken });
     const botOctokit = new GitHubService({ token: env.GITHUB_BOT_TOKEN });
 
     const totalTime = Math.round(
       (Date.now() - new Date(job.startedAt!).getTime()) / 1000,
     );
+    console.log(`Total build time: ${totalTime}s`);
 
     // Update deployment in database
+    console.log(`Updating deployment in database for deployment ID: ${jobData.deploymentId}`);
     await db
       .update(deployments)
       .set({
@@ -403,6 +413,7 @@ export class JobQueue {
       .where(eq(deployments.id, jobData.deploymentId));
 
     if (snapshot.success) {
+      console.log(`Snapshot successful for deployment ID: ${jobData.deploymentId}`);
       // Update GitHub deployment status
       await userOctokit.createDeploymentStatus({
         owner: jobData.owner,
@@ -412,10 +423,12 @@ export class JobQueue {
         description: `Successfully built ${snapshot.circuitFiles.length} circuit${snapshot.circuitFiles.length === 1 ? "" : "s"} in ${totalTime}s`,
         logUrl: `${jobData.context.serverUrl}/${jobData.owner}/${jobData.repo}/actions/runs/${jobData.context.runId}`,
       });
+      console.log(`GitHub deployment status updated for deployment ID: ${jobData.deploymentId_github}`);
 
       // Generate and post PR comment for pull requests
       if (jobData.eventType === "pull_request") {
         try {
+          console.log(`Generating PR comment for deployment ID: ${jobData.deploymentId}`);
           const prCommentData: PRCommentData = {
             deploymentId: jobData.deploymentId,
             previewUrl: `${DEPLOY_URL}/deployments/${jobData.deploymentId_github}`,
@@ -434,9 +447,7 @@ export class JobQueue {
             body: prComment,
           });
 
-          console.log(
-            `PR comment posted for deployment ${jobData.deploymentId}`,
-          );
+          console.log(`PR comment posted for deployment ${jobData.deploymentId}`);
         } catch (error) {
           console.error("Failed to post PR comment:", error);
         }
@@ -445,6 +456,7 @@ export class JobQueue {
       // Update check run for pull requests
       if (jobData.checkRunId) {
         try {
+          console.log(`Updating check run for deployment ID: ${jobData.deploymentId}`);
           await userOctokit.updateCheckRun({
             owner: jobData.owner,
             repo: jobData.repo,
@@ -459,9 +471,7 @@ export class JobQueue {
             },
           });
 
-          console.log(
-            `Check run updated for deployment ${jobData.deploymentId}`,
-          );
+          console.log(`Check run updated for deployment ${jobData.deploymentId}`);
         } catch (error) {
           console.error("Failed to update check run:", error);
         }
@@ -470,6 +480,7 @@ export class JobQueue {
       // Handle release creation for push events
       if (jobData.eventType === "push" && jobData.create_release) {
         try {
+          console.log(`Handling release creation for deployment ID: ${jobData.deploymentId}`);
           const branch = jobData.ref.replace("refs/heads/", "");
           if (branch === "main" || branch === "master") {
             const { tag: lastTag } = await userOctokit.getLatestTag({
@@ -500,15 +511,15 @@ export class JobQueue {
                 sha: tagSha,
               });
 
-              console.log(
-                `Release v${packageVersion} created for deployment ${jobData.deploymentId}`,
-              );
+              console.log(`Release v${packageVersion} created for deployment ${jobData.deploymentId}`);
             }
           }
         } catch (error) {
           console.error("Error creating release:", error);
         }
       }
+    } else {
+      console.log(`Snapshot failed for deployment ID: ${jobData.deploymentId}`);
     }
   }
 
