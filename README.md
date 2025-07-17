@@ -199,6 +199,63 @@ bun run dev --filter=bot      # GitHub App webhook handler
 bun run dev --filter=server   # Preview deployment server
 ```
 
+## 📚 API Documentation
+
+### Artifacts API
+
+#### Get Build Artifacts
+Get all build artifacts for a deployment:
+```bash
+GET /api/artifacts?deploymentId={deploymentId}
+GET /api/artifacts?jobId={jobId}
+GET /api/artifacts?artifactId={artifactId}
+```
+
+Query Parameters:
+- `deploymentId` - Get artifacts for a specific deployment
+- `jobId` - Get artifacts for a specific build job
+- `artifactId` - Get specific artifact details
+- `fileType` - Filter by file type (default: "circuit-json")
+
+#### Download Circuit JSON
+Download individual circuit JSON files:
+```bash
+GET /api/artifacts/{artifactId}/download
+```
+
+Returns the circuit JSON file with proper headers for download.
+
+### Deployments API
+
+#### Get Deployment Details
+```bash
+GET /api/deployments?id={deploymentId}
+```
+
+Response includes:
+- Deployment metadata
+- Build status and duration
+- Circuit file count
+- Artifact count and availability
+- Complete snapshot result with circuit data
+
+### SVG Generation API
+
+#### Generate Circuit SVGs
+```bash
+GET /api/svg/{deploymentId}/{fileIndex}/{type}
+```
+
+Parameters:
+- `deploymentId` - Deployment ID
+- `fileIndex` - Index of circuit file (0-based)
+- `type` - SVG type: "pcb", "schematic", or "3d"
+
+Query Parameters:
+- `width` - SVG width (optional)
+- `height` - SVG height (optional)
+- `theme` - "light" or "dark" (optional)
+
 ## 📊 Project Roadmap
 
 ### Phase 1: Core Infrastructure ✅
@@ -219,6 +276,8 @@ bun run dev --filter=server   # Preview deployment server
 
 ### Phase 3: Enhanced Features (In Progress)
 
+- [x] Build artifacts storage for circuit JSON files
+- [x] Build artifacts API for downloading individual circuit files
 - [ ] Interactive circuit viewer with WebGL
 - [ ] Snapshot diff visualization with side-by-side comparison
 - [ ] Build caching and optimization

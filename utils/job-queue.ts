@@ -1,5 +1,5 @@
 import { eq, desc, sql } from "drizzle-orm";
-import { db, buildJobs, deployments, BuildJob, NewBuildJob } from "../db";
+import { db, buildJobs, deployments, buildArtifacts, BuildJob, NewBuildJob, NewBuildArtifact } from "../db";
 import { SnapshotProcessor, BuildProgress } from "./snapshot-processor";
 import { GitHubService } from "../shared/github.service";
 import { DEPLOY_URL } from "../shared/constants";
@@ -395,6 +395,64 @@ export class JobQueue {
     return await processor.generateSnapshot();
   }
 
+  private async saveBuildArtifacts(jobId: string, snapshot: any): Promise<void> {
+    try {
+      if (!snapshot.success || !snapshot.circuitFiles || !Array.isArray(snapshot.circuitFiles)) {
+        console.log("No circuit files to save as artifacts");
+        return;
+      }
+
+      console.log(`Saving ${snapshot.circuitFiles.length} circuit files as build artifacts`);
+
+      const artifacts: NewBuildArtifact[] = snapshot.circuitFiles.map((file: any, index: number) => {
+        const circuitJsonString = JSON.stringify(file.circuitJson, null, 2);
+        const fileSize = Buffer.byteLength(circuitJsonString, 'utf8');
+        
+        return {
+          jobId: jobId,
+          fileName: file.name || `circuit-${index}.json`,
+          fileType: "circuit-json",
+          filePath: file.path || `circuits/circuit-${index}.json`,
+          fileSize: fileSize,
+          mimeType: "application/json",
+          metadata: {
+            originalPath: file.path,
+            circuitComplexity: this.getCircuitComplexity(file.circuitJson),
+            generatedAt: new Date().toISOString(),
+            hasComponents: Array.isArray(file.circuitJson) ? file.circuitJson.length > 0 : !!file.circuitJson,
+            fileMetadata: file.metadata || null,
+          },
+        };
+      });
+
+      // Save all artifacts to database
+      if (artifacts.length > 0) {
+        await db.insert(buildArtifacts).values(artifacts);
+        console.log(`✅ Saved ${artifacts.length} circuit files as build artifacts`);
+      }
+    } catch (error) {
+      console.error("❌ Failed to save build artifacts:", error);
+      // Don't throw error - artifacts saving shouldn't fail the entire build
+    }
+  }
+
+  private getCircuitComplexity(circuitJson: any): string {
+    if (!circuitJson) return "empty";
+    
+    let elementCount = 0;
+    if (Array.isArray(circuitJson)) {
+      elementCount = circuitJson.length;
+    } else if (typeof circuitJson === "object") {
+      elementCount = Object.keys(circuitJson).length;
+    }
+
+    if (elementCount === 0) return "empty";
+    if (elementCount <= 5) return "simple";
+    if (elementCount <= 20) return "moderate";
+    if (elementCount <= 50) return "complex";
+    return "very-complex";
+  }
+
   private async finalizeBuild(
     job: BuildJob,
     jobData: BuildJobData,
@@ -408,6 +466,9 @@ export class JobQueue {
       (Date.now() - new Date(job.startedAt!).getTime()) / 1000,
     );
     console.log(`Total build time: ${totalTime}s`);
+
+    // Save circuit files as build artifacts
+    await this.saveBuildArtifacts(job.id, snapshot);
 
     // Update deployment in database
     console.log(
