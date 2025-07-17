@@ -5,7 +5,7 @@ export async function GET() {
   try {
     // Check database connectivity
     const dbHealth = await checkDatabaseConnection();
-    
+
     const healthData = {
       status: dbHealth.healthy ? "healthy" : "unhealthy",
       timestamp: new Date().toISOString(),
@@ -18,9 +18,9 @@ export async function GET() {
       environment: {
         nodeEnv: process.env.NODE_ENV,
         hasDatabaseUrl: !!process.env.DATABASE_URL,
-        databaseUrlHost: process.env.DATABASE_URL ? 
-          new URL(process.env.DATABASE_URL).hostname : 
-          "not configured",
+        databaseUrlHost: process.env.DATABASE_URL
+          ? new URL(process.env.DATABASE_URL).hostname
+          : "not configured",
       },
     };
 
@@ -36,7 +36,7 @@ export async function GET() {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -55,7 +55,7 @@ export async function GET() {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

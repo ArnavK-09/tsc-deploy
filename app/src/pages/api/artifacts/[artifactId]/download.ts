@@ -1,4 +1,9 @@
-import { db, buildArtifacts, deployments, buildJobs } from "../../../../../../db";
+import {
+  db,
+  buildArtifacts,
+  deployments,
+  buildJobs,
+} from "../../../../../../db";
 import { eq } from "drizzle-orm";
 import { createErrorResponse } from "@/utils/http";
 
@@ -36,10 +41,10 @@ export async function GET(context: {
 
     // Find the matching circuit file by name or path
     const circuitFile = snapshotData.circuitFiles.find(
-      (file: any) => 
-        file.name === artifact.fileName || 
+      (file: any) =>
+        file.name === artifact.fileName ||
         file.path === artifact.filePath ||
-        file.path === (artifact.metadata as any)?.originalPath
+        file.path === (artifact.metadata as any)?.originalPath,
     );
 
     if (!circuitFile || !circuitFile.circuitJson) {
@@ -54,12 +59,16 @@ export async function GET(context: {
       headers: {
         "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${artifact.fileName}"`,
-        "Content-Length": Buffer.byteLength(circuitJsonString, 'utf8').toString(),
+        "Content-Length": Buffer.byteLength(
+          circuitJsonString,
+          "utf8",
+        ).toString(),
         "Cache-Control": "public, max-age=86400", // Cache for 24 hours
         "X-Artifact-Id": artifactId,
         "X-Deployment-Id": deploymentId,
         "X-File-Type": artifact.fileType,
-        "X-Original-Path": (artifact.metadata as any)?.originalPath || artifact.filePath,
+        "X-Original-Path":
+          (artifact.metadata as any)?.originalPath || artifact.filePath,
       },
     });
   } catch (error) {
@@ -68,13 +77,13 @@ export async function GET(context: {
     if (error instanceof Error) {
       return createErrorResponse(
         `Failed to download artifact: ${error.message}`,
-        500
+        500,
       );
     }
 
     return createErrorResponse(
       "Internal server error while downloading artifact",
-      500
+      500,
     );
   }
-} 
+}

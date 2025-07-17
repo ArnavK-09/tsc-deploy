@@ -25,13 +25,17 @@ try {
 export const db = dbInstance;
 
 // Database health check function
-export async function checkDatabaseConnection(): Promise<{ healthy: boolean; error?: string }> {
+export async function checkDatabaseConnection(): Promise<{
+  healthy: boolean;
+  error?: string;
+}> {
   try {
     // Simple query to test connection
     await sql`SELECT 1 as test`;
     return { healthy: true };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown database error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown database error";
     console.error("❌ Database health check failed:", errorMessage);
     return { healthy: false, error: errorMessage };
   }
@@ -40,7 +44,7 @@ export async function checkDatabaseConnection(): Promise<{ healthy: boolean; err
 // Wrapper function for database operations with retry logic
 export async function withDatabaseErrorHandling<T>(
   operation: () => Promise<T>,
-  context = "database operation"
+  context = "database operation",
 ): Promise<T> {
   try {
     return await operation();
@@ -54,14 +58,19 @@ export async function withDatabaseErrorHandling<T>(
       });
 
       // Check if it's a connection-related error
-      if (error.message.includes("SASL") || error.message.includes("authentication")) {
+      if (
+        error.message.includes("SASL") ||
+        error.message.includes("authentication")
+      ) {
         throw new Error(
-          `Database authentication failed. Please check your DATABASE_URL environment variable. Original error: ${error.message}`
+          `Database authentication failed. Please check your DATABASE_URL environment variable. Original error: ${error.message}`,
         );
       }
 
       // Re-throw with additional context
-      throw new Error(`Database operation failed in ${context}: ${error.message}`);
+      throw new Error(
+        `Database operation failed in ${context}: ${error.message}`,
+      );
     }
     throw error;
   }

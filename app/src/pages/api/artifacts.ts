@@ -43,8 +43,8 @@ export async function GET(context: { request: Request }) {
         .where(
           and(
             eq(buildArtifacts.jobId, job.id),
-            eq(buildArtifacts.fileType, fileType)
-          )
+            eq(buildArtifacts.fileType, fileType),
+          ),
         );
 
       return createSuccessResponse({
@@ -63,8 +63,8 @@ export async function GET(context: { request: Request }) {
         .where(
           and(
             eq(buildArtifacts.jobId, jobId),
-            eq(buildArtifacts.fileType, fileType)
-          )
+            eq(buildArtifacts.fileType, fileType),
+          ),
         );
 
       return createSuccessResponse({
@@ -76,16 +76,16 @@ export async function GET(context: { request: Request }) {
 
     return createErrorResponse(
       "Either deploymentId, jobId, or artifactId parameter is required",
-      400
+      400,
     );
   } catch (error) {
     console.error("Error fetching build artifacts:", error);
     if (error instanceof Error) {
       return createErrorResponse(
         `Failed to fetch artifacts: ${error.message}`,
-        500
+        500,
       );
     }
     return createErrorResponse("Internal server error", 500);
   }
-} 
+}

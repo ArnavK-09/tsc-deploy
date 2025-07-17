@@ -1,5 +1,13 @@
 import { eq, desc, sql } from "drizzle-orm";
-import { db, buildJobs, deployments, buildArtifacts, BuildJob, NewBuildJob, NewBuildArtifact } from "../db";
+import {
+  db,
+  buildJobs,
+  deployments,
+  buildArtifacts,
+  BuildJob,
+  NewBuildJob,
+  NewBuildArtifact,
+} from "../db";
 import { SnapshotProcessor, BuildProgress } from "./snapshot-processor";
 import { GitHubService } from "../shared/github.service";
 import { DEPLOY_URL } from "../shared/constants";
@@ -290,7 +298,7 @@ export class JobQueue {
       `Downloading archive from provided URL: ${jobData.repoArchiveUrl}`,
     );
     console.log(
-      `Using token: ${jobData.githubToken ? jobData.githubToken : "NO TOKEN"}`,
+      `Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + "..." : "NO TOKEN"}`,
     );
 
     const response = await fetch(jobData.repoArchiveUrl!, {
@@ -306,7 +314,7 @@ export class JobQueue {
       );
       console.error(`URL: ${jobData.repoArchiveUrl}`);
       console.error(`Headers sent:`, {
-        Authorization: `token ${jobData.githubToken ? jobData.githubToken : "NO TOKEN"}`,
+        Authorization: `Bearer ${jobData.githubToken ? "[REDACTED]" : "NO TOKEN"}`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       });
 
@@ -363,7 +371,7 @@ export class JobQueue {
       );
       console.error(`URL: ${archiveUrl}`);
       console.error(`Headers sent:`, {
-        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + "..." : "NO TOKEN"}`,
+        Authorization: `Bearer [REDACTED]`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       });
 
@@ -395,50 +403,81 @@ export class JobQueue {
     return await processor.generateSnapshot();
   }
 
-  private async saveBuildArtifacts(jobId: string, snapshot: any): Promise<void> {
+  private async saveBuildArtifacts(
+    jobId: string,
+    snapshot: any,
+  ): Promise<void> {
     try {
-      if (!snapshot.success || !snapshot.circuitFiles || !Array.isArray(snapshot.circuitFiles)) {
+      if (
+        !snapshot.success ||
+        !snapshot.circuitFiles ||
+        !Array.isArray(snapshot.circuitFiles)
+      ) {
         console.log("No circuit files to save as artifacts");
         return;
       }
 
-      console.log(`Saving ${snapshot.circuitFiles.length} circuit files as build artifacts`);
+      console.log(
+        `Saving ${snapshot.circuitFiles.length} circuit files as build artifacts`,
+      );
 
-      const artifacts: NewBuildArtifact[] = snapshot.circuitFiles.map((file: any, index: number) => {
-        const circuitJsonString = JSON.stringify(file.circuitJson, null, 2);
-        const fileSize = Buffer.byteLength(circuitJsonString, 'utf8');
-        
-        return {
-          jobId: jobId,
-          fileName: file.name || `circuit-${index}.json`,
-          fileType: "circuit-json",
-          filePath: file.path || `circuits/circuit-${index}.json`,
-          fileSize: fileSize,
-          mimeType: "application/json",
-          metadata: {
-            originalPath: file.path,
-            circuitComplexity: this.getCircuitComplexity(file.circuitJson),
-            generatedAt: new Date().toISOString(),
-            hasComponents: Array.isArray(file.circuitJson) ? file.circuitJson.length > 0 : !!file.circuitJson,
-            fileMetadata: file.metadata || null,
-          },
-        };
-      });
+      const artifacts: NewBuildArtifact[] = snapshot.circuitFiles.map(
+        (file: any, index: number) => {
+          const circuitJsonString = JSON.stringify(file.circuitJson, null, 2);
+          const fileSize = Buffer.byteLength(circuitJsonString, "utf8");
+
+          return {
+            jobId: jobId,
+            fileName: file.name || `circuit-${index}.json`,
+            fileType: "circuit-json",
+            filePath: file.path || `circuits/circuit-${index}.json`,
+            fileSize: fileSize,
+            mimeType: "application/json",
+            metadata: {
+              originalPath: file.path,
+              circuitComplexity: this.getCircuitComplexity(file.circuitJson),
+              generatedAt: new Date().toISOString(),
+              hasComponents: Array.isArray(file.circuitJson)
+                ? file.circuitJson.length > 0
+                : !!file.circuitJson,
+              fileMetadata: file.metadata || null,
+            },
+          };
+        },
+      );
 
       // Save all artifacts to database
       if (artifacts.length > 0) {
         await db.insert(buildArtifacts).values(artifacts);
-        console.log(`✅ Saved ${artifacts.length} circuit files as build artifacts`);
+        console.log(
+          `✅ Saved ${artifacts.length} circuit files as build artifacts`,
+        );
       }
     } catch (error) {
-      console.error("❌ Failed to save build artifacts:", error);
-      // Don't throw error - artifacts saving shouldn't fail the entire build
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.warn(
+        "⚠️ Failed to save build artifacts (continuing build):",
+        errorMessage,
+      );
+
+      // Log specific database errors for debugging
+      if (
+        errorMessage.includes("does not exist") ||
+        errorMessage.includes("buildArtifacts")
+      ) {
+        console.warn(
+          "📊 Build artifacts table may not exist - skipping artifact storage",
+        );
+      }
+
+      // Don't throw error - artifacts saving is optional and shouldn't fail the entire build
     }
   }
 
   private getCircuitComplexity(circuitJson: any): string {
     if (!circuitJson) return "empty";
-    
+
     let elementCount = 0;
     if (Array.isArray(circuitJson)) {
       elementCount = circuitJson.length;
@@ -467,8 +506,15 @@ export class JobQueue {
     );
     console.log(`Total build time: ${totalTime}s`);
 
-    // Save circuit files as build artifacts
-    await this.saveBuildArtifacts(job.id, snapshot);
+    // Save circuit files as build artifacts (non-blocking)
+    try {
+      await this.saveBuildArtifacts(job.id, snapshot);
+    } catch (artifactError) {
+      console.warn(
+        "Failed to save build artifacts (non-blocking):",
+        artifactError,
+      );
+    }
 
     // Update deployment in database
     console.log(

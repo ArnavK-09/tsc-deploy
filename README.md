@@ -138,7 +138,9 @@ bun run migrate
 If you encounter `SASL: Last message was not SASLResponse` or similar database authentication errors:
 
 #### 1. Check DATABASE_URL Format
+
 Ensure your `DATABASE_URL` follows the correct format:
+
 ```bash
 # For local PostgreSQL
 DATABASE_URL=postgresql://username:password@localhost:5432/database_name
@@ -151,7 +153,9 @@ DATABASE_URL=postgresql://username:password@ep-xxx.region.neon.tech/database_nam
 ```
 
 #### 2. Verify Environment Variables
+
 Check that environment variables are properly set in your deployment:
+
 ```bash
 # Test the health endpoint
 curl https://your-deployment-url/api/
@@ -167,23 +171,30 @@ curl https://your-deployment-url/api/
 ```
 
 #### 3. Database Provider Configuration
+
 - **Vercel Postgres**: Ensure you're using the connection string from Vercel dashboard
 - **Neon Database**: Verify the connection string includes `?sslmode=require`
 - **Local PostgreSQL**: Check that the database server is running and accessible
 
 #### 4. Vercel Deployment Issues
+
 If the error occurs only in production:
+
 1. Check environment variables in Vercel dashboard
 2. Ensure `DATABASE_URL` is set in production environment
 3. Verify the database allows connections from Vercel's IP ranges
 4. Test the connection manually using the health endpoint
 
 #### 5. Debug Database Connection
+
 Use the enhanced health check endpoint to diagnose issues:
+
 ```bash
 curl https://your-deployment-url/api/
 ```
+
 This will return detailed information about:
+
 - Database connection status
 - Environment configuration
 - Connection error details
@@ -204,7 +215,9 @@ bun run dev --filter=server   # Preview deployment server
 ### Artifacts API
 
 #### Get Build Artifacts
+
 Get all build artifacts for a deployment:
+
 ```bash
 GET /api/artifacts?deploymentId={deploymentId}
 GET /api/artifacts?jobId={jobId}
@@ -212,13 +225,16 @@ GET /api/artifacts?artifactId={artifactId}
 ```
 
 Query Parameters:
+
 - `deploymentId` - Get artifacts for a specific deployment
 - `jobId` - Get artifacts for a specific build job
 - `artifactId` - Get specific artifact details
 - `fileType` - Filter by file type (default: "circuit-json")
 
 #### Download Circuit JSON
+
 Download individual circuit JSON files:
+
 ```bash
 GET /api/artifacts/{artifactId}/download
 ```
@@ -228,11 +244,13 @@ Returns the circuit JSON file with proper headers for download.
 ### Deployments API
 
 #### Get Deployment Details
+
 ```bash
 GET /api/deployments?id={deploymentId}
 ```
 
 Response includes:
+
 - Deployment metadata
 - Build status and duration
 - Circuit file count
@@ -242,16 +260,19 @@ Response includes:
 ### SVG Generation API
 
 #### Generate Circuit SVGs
+
 ```bash
 GET /api/svg/{deploymentId}/{fileIndex}/{type}
 ```
 
 Parameters:
+
 - `deploymentId` - Deployment ID
 - `fileIndex` - Index of circuit file (0-based)
 - `type` - SVG type: "pcb", "schematic", or "3d"
 
 Query Parameters:
+
 - `width` - SVG width (optional)
 - `height` - SVG height (optional)
 - `theme` - "light" or "dark" (optional)

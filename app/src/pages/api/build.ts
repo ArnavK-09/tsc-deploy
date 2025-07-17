@@ -50,7 +50,7 @@ export async function POST(context: { request: Request }) {
     // Insert deployment with database error handling
     await withDatabaseErrorHandling(
       () => db.insert(deployments).values(newDeployment),
-      "creating deployment record"
+      "creating deployment record",
     );
 
     const buildJobData: BuildJobData = {
@@ -88,7 +88,7 @@ export async function POST(context: { request: Request }) {
       if (error.message.includes("Database authentication failed")) {
         return createErrorResponse(
           "Database connection failed. Please check server configuration.",
-          500
+          500,
         );
       }
       return createErrorResponse(`Build request failed: ${error.message}`, 500);

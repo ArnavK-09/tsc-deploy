@@ -42,7 +42,7 @@ export async function GET(context: { request: Request }) {
             .select({ count: sql<number>`cast(count(*) as integer)` })
             .from(buildArtifacts)
             .where(eq(buildArtifacts.jobId, job.id));
-          
+
           artifactCount = count || 0;
         }
       } catch (error) {

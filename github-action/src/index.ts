@@ -112,11 +112,11 @@ async function run(): Promise<void> {
     core.info("🔍 Preparing build request...");
 
     // Create archive URL for faster download
-    const ref =
+    const archiveRef =
       EVENT_TYPE === "pull_request"
-        ? `refs/pull/${context.payload.pull_request?.number}/head`
+        ? context.payload.pull_request?.head.sha || context.sha
         : context.sha;
-    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/tarball/${ref}`;
+    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/tarball/${archiveRef}`;
 
     const buildRequest: SimpleBuildRequest = {
       id: ID,
@@ -234,29 +234,40 @@ ${buildResult.status === "completed" ? "🎉 Your circuits have been successfull
     core.info(`🔗 Job ID: ${jobId}`);
     core.info(`⏱️ Total time: ${totalTime}s`);
     core.info(`🔗 Preview URL: ${previewUrl}`);
-    } catch (error) {
+  } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    
+
     // Determine error type for better reporting
     let errorType = "Unknown Error";
     let troubleshooting = "Check the logs above for more details.";
-    
-    if (errorMessage.includes("Database authentication failed") || errorMessage.includes("SASL")) {
+
+    if (
+      errorMessage.includes("Database authentication failed") ||
+      errorMessage.includes("SASL")
+    ) {
       errorType = "Database Connection Error";
-      troubleshooting = "Check your DATABASE_URL environment variable and database connectivity.";
-    } else if (errorMessage.includes("Network error") || errorMessage.includes("other side closed")) {
+      troubleshooting =
+        "Check your DATABASE_URL environment variable and database connectivity.";
+    } else if (
+      errorMessage.includes("Network error") ||
+      errorMessage.includes("other side closed")
+    ) {
       errorType = "Network Connection Error";
-      troubleshooting = "This is usually a temporary issue. The build will retry automatically.";
+      troubleshooting =
+        "This is usually a temporary issue. The build will retry automatically.";
     } else if (errorMessage.includes("Build monitoring failed")) {
       errorType = "Build Monitoring Error";
-      troubleshooting = "The build status monitoring failed after multiple retries. Check server connectivity.";
+      troubleshooting =
+        "The build status monitoring failed after multiple retries. Check server connectivity.";
     } else if (errorMessage.includes("Build failed:")) {
       errorType = "Build Process Error";
-      troubleshooting = "The build process itself failed. Check your circuit files and dependencies.";
+      troubleshooting =
+        "The build process itself failed. Check your circuit files and dependencies.";
     } else if (errorMessage.includes("Unauthorized")) {
       errorType = "Authentication Error";
-      troubleshooting = "Check your GitHub token permissions and repository access.";
+      troubleshooting =
+        "Check your GitHub token permissions and repository access.";
     }
 
     // Create failure summary
@@ -279,7 +290,7 @@ ${errorType === "Network Connection Error" ? "ℹ️ **Note**: Network errors ar
 
     core.summary.addRaw(failureSummary);
     await core.summary.write();
-    
+
     core.error(error as Error);
     core.setFailed(`☠️ ${errorType}: ${errorMessage}`);
     process.exit(1);
@@ -378,24 +389,30 @@ async function waitForBuildCompletion(
         const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
         core.warning(`⚠️ Build status check failed: ${errorMsg}`);
         consecutiveErrors++;
-        
+
         if (consecutiveErrors >= maxConsecutiveErrors) {
-          throw new Error(`Build monitoring failed after ${maxConsecutiveErrors} consecutive errors. Last error: ${errorMsg}`);
+          throw new Error(
+            `Build monitoring failed after ${maxConsecutiveErrors} consecutive errors. Last error: ${errorMsg}`,
+          );
         }
       }
     } catch (error) {
       consecutiveErrors++;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
       // Check if it's a network/connection error that we should retry
-      const isNetworkError = errorMessage.includes("other side closed") ||
-                           errorMessage.includes("ECONNRESET") ||
-                           errorMessage.includes("ENOTFOUND") ||
-                           errorMessage.includes("timeout") ||
-                           errorMessage.includes("network");
+      const isNetworkError =
+        errorMessage.includes("other side closed") ||
+        errorMessage.includes("ECONNRESET") ||
+        errorMessage.includes("ENOTFOUND") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("network");
 
       if (isNetworkError && consecutiveErrors < maxConsecutiveErrors) {
-        core.warning(`⚠️ Network error (${consecutiveErrors}/${maxConsecutiveErrors}): ${errorMessage}`);
+        core.warning(
+          `⚠️ Network error (${consecutiveErrors}/${maxConsecutiveErrors}): ${errorMessage}`,
+        );
         core.info("🔄 Retrying in 15 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 15000)); // Wait 15s before retry
         continue;
@@ -403,15 +420,22 @@ async function waitForBuildCompletion(
 
       // For non-network errors or after max retries, fail immediately
       if (consecutiveErrors >= maxConsecutiveErrors) {
-        throw new Error(`Build monitoring failed after ${maxConsecutiveErrors} consecutive errors. Last error: ${errorMessage}`);
+        throw new Error(
+          `Build monitoring failed after ${maxConsecutiveErrors} consecutive errors. Last error: ${errorMessage}`,
+        );
       }
 
       // For build status errors (completed, failed, cancelled), fail immediately
-      if (errorMessage.includes("Build failed:") || errorMessage.includes("Build was cancelled")) {
+      if (
+        errorMessage.includes("Build failed:") ||
+        errorMessage.includes("Build was cancelled")
+      ) {
         throw error;
       }
 
-      core.warning(`⚠️ Error checking build status (${consecutiveErrors}/${maxConsecutiveErrors}): ${errorMessage}`);
+      core.warning(
+        `⚠️ Error checking build status (${consecutiveErrors}/${maxConsecutiveErrors}): ${errorMessage}`,
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
