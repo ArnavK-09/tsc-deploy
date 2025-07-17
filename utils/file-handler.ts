@@ -186,38 +186,17 @@ export class FileHandler {
     archivePath: string,
     outputDir: string,
   ): Promise<void> {
-    console.log(
-      `Extracting2 archive from ${archivePath} to ${outputDir} using tar package`,
-    );
-    await createTar({
-      file: archivePath,
-      cwd: outputDir,
-      strip: 0,
-    });
-    // try {
-    //   if (createTar) {
-    //     // Use tar package for extraction
-    //     console.log(
-    //       `Extracting archive from ${archivePath} to ${outputDir} using tar package`,
-    //     );
-    //     await createTar({
-    //       file: archivePath,
-    //       cwd: outputDir,
-    //       strip: 0,
-    //     });
-    //   } else {
-    //     // Fallback to shell command
-    //     console.log(
-    //       `Extracting archive from ${archivePath} to ${outputDir} using shell command`,
-    //     );
-    //     fs.mkdirSync(outputDir, { recursive: true });
+    try {
+      console.log(
+        `Extracting archive from ${archivePath} to ${outputDir} using shell command`,
+      );
+      fs.mkdirSync(outputDir, { recursive: true });
 
-    //     const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
-    //     await execAsync(extractCommand);
-    //   }
-    // } catch (error) {
-    //   throw new Error(`Failed to extract archive: ${error}`);
-    // }
+      const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
+      await execAsync(extractCommand);
+    } catch (error) {
+      throw new Error(`Failed to extract archive: ${error}`);
+    }
   }
 
   static getTemporaryPath(prefix: string = "temp"): string {
