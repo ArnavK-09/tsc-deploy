@@ -161,7 +161,7 @@ export class SnapshotProcessor {
       this.updateProgress(
         "processing",
         90,
-        "Circuit JSON generated successfully",
+        `Circuit JSON generated successfully for ${filePath}`,
       );
       return circuitJson;
     } catch (error) {

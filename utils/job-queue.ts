@@ -518,8 +518,6 @@ export class JobQueue {
           console.error("Error creating release:", error);
         }
       }
-    } else {
-      console.log(`Snapshot failed for deployment ID: ${jobData.deploymentId}`);
     }
   }
 
