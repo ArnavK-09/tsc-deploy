@@ -474,7 +474,7 @@ export class JobQueue {
         }
       }
 
-      // Update check run for pull requests
+      // Update check
       if (jobData.checkRunId) {
         try {
           console.log(
