@@ -61,7 +61,7 @@ export class GitHubService {
         repo: params.repo,
         deployment_id: params.deploymentId,
         state: params.state,
-        description: params.description,
+        description: params.description.substring(0, 139),
         environment_url: params.environmentUrl,
         log_url: params.logUrl,
       });

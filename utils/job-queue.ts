@@ -259,7 +259,7 @@ export class JobQueue {
         } catch (fetchError) {
           console.warn("Fetch download failed:", fetchError);
           throw new Error(
-            `Failed to download repository: ${error}. Archive URL may be invalid or repository may be private.`,
+            `Failed to download repository: ${error}. Archive URL: ${jobData.repoArchiveUrl}`,
           );
         }
       }

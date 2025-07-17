@@ -158,7 +158,9 @@ export class FileHandler {
   ): Promise<void> {
     try {
       if (createTar) {
-        console.log(`Compressing directory ${dirPath} to ${outputPath}`);
+        console.log(
+          `Compressing directory ${dirPath} to ${outputPath} using tar package`,
+        );
         await createTar(
           {
             file: outputPath,
@@ -169,6 +171,9 @@ export class FileHandler {
         );
       } else {
         // Fallback to shell command
+        console.log(
+          `Compressing directory ${dirPath} to ${outputPath} using shell command`,
+        );
         const tarCommand = `tar -czf "${outputPath}" -C "${path.dirname(dirPath)}" "${path.basename(dirPath)}"`;
         await execAsync(tarCommand);
       }
@@ -181,25 +186,38 @@ export class FileHandler {
     archivePath: string,
     outputDir: string,
   ): Promise<void> {
-    try {
-      if (createTar) {
-        // Use tar package for extraction
-        console.log(`Extracting archive from ${archivePath} to ${outputDir}`);
-        await createTar({
-          file: archivePath,
-          cwd: outputDir,
-          strip: 0,
-        });
-      } else {
-        // Fallback to shell command
-        fs.mkdirSync(outputDir, { recursive: true });
+    console.log(
+      `Extracting2 archive from ${archivePath} to ${outputDir} using tar package`,
+    );
+    await createTar({
+      file: archivePath,
+      cwd: outputDir,
+      strip: 0,
+    });
+    // try {
+    //   if (createTar) {
+    //     // Use tar package for extraction
+    //     console.log(
+    //       `Extracting archive from ${archivePath} to ${outputDir} using tar package`,
+    //     );
+    //     await createTar({
+    //       file: archivePath,
+    //       cwd: outputDir,
+    //       strip: 0,
+    //     });
+    //   } else {
+    //     // Fallback to shell command
+    //     console.log(
+    //       `Extracting archive from ${archivePath} to ${outputDir} using shell command`,
+    //     );
+    //     fs.mkdirSync(outputDir, { recursive: true });
 
-        const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
-        await execAsync(extractCommand);
-      }
-    } catch (error) {
-      throw new Error(`Failed to extract archive: ${error}`);
-    }
+    //     const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
+    //     await execAsync(extractCommand);
+    //   }
+    // } catch (error) {
+    //   throw new Error(`Failed to extract archive: ${error}`);
+    // }
   }
 
   static getTemporaryPath(prefix: string = "temp"): string {
