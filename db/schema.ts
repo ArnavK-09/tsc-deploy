@@ -6,7 +6,6 @@ import {
   varchar,
   pgEnum,
   jsonb,
-  boolean,
   uuid,
 } from "drizzle-orm/pg-core";
 

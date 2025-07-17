@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-
+import { create as createTar } from "tar";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 export interface FileChunk {
   id: string;
   index: number;
@@ -17,6 +19,8 @@ export interface LargeFileMetadata {
   checksum: string;
   mimeType?: string;
 }
+
+const execAsync = promisify(exec);
 
 export class FileHandler {
   private static readonly CHUNK_SIZE = 1024 * 1024; // 1MB chunks
@@ -153,11 +157,9 @@ export class FileHandler {
     outputPath: string,
   ): Promise<void> {
     try {
-      // Try using Node.js tar package if available
-      const tar = await import("tar").catch(() => null);
-
-      if (tar) {
-        await tar.create(
+      if (createTar) {
+        console.log(`Compressing directory ${dirPath} to ${outputPath}`);
+        await createTar(
           {
             file: outputPath,
             gzip: true,
@@ -167,10 +169,6 @@ export class FileHandler {
         );
       } else {
         // Fallback to shell command
-        const { exec } = await import("node:child_process");
-        const { promisify } = await import("node:util");
-        const execAsync = promisify(exec);
-
         const tarCommand = `tar -czf "${outputPath}" -C "${path.dirname(dirPath)}" "${path.basename(dirPath)}"`;
         await execAsync(tarCommand);
       }
@@ -184,22 +182,16 @@ export class FileHandler {
     outputDir: string,
   ): Promise<void> {
     try {
-      // Try using Node.js built-in tar extraction if available
-      const tar = await import("tar").catch(() => null);
-
-      if (tar) {
+      if (createTar) {
         // Use tar package for extraction
-        await tar.extract({
+        console.log(`Extracting archive from ${archivePath} to ${outputDir}`);
+        await createTar({
           file: archivePath,
           cwd: outputDir,
           strip: 0,
         });
       } else {
         // Fallback to shell command
-        const { exec } = await import("node:child_process");
-        const { promisify } = await import("node:util");
-        const execAsync = promisify(exec);
-
         fs.mkdirSync(outputDir, { recursive: true });
 
         const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;

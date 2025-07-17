@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { CircuitRunner } from "tscircuit";
 import { createHash } from "node:crypto";
 import { SnapshotResult, CircuitFile } from "../shared/types";
+import { FileHandler } from "./file-handler";
 
 const execAsync = promisify(exec);
 const ALLOWED_FILE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
@@ -62,7 +63,7 @@ export class SnapshotProcessor {
           this.workingDirectory,
         );
         files.push(...manualFiles);
-        console.log("Files found:", manualFiles)
+        console.log("Files found:", manualFiles);
       } catch (fallbackError) {
         console.warn(`Manual file search also failed: ${fallbackError}`);
       }
@@ -226,7 +227,6 @@ export class SnapshotProcessor {
 
   private async getRepositorySize(): Promise<number> {
     try {
-      const { FileHandler } = await import("./file-handler");
       return await FileHandler.getDirectorySize(this.workingDirectory);
     } catch {
       return 0;
@@ -306,7 +306,7 @@ export class SnapshotProcessor {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      const isNonRetryable = 
+      const isNonRetryable =
         errorMessage.includes("404 Not Found") ||
         errorMessage.includes("403 Forbidden") ||
         errorMessage.includes("repository may be private") ||
