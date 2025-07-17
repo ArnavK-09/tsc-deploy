@@ -2,15 +2,15 @@ name: Sample tscircuit Deploy
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
   pull_request:
     types: [opened, reopened, synchronize]
     branches: [main]
 
 jobs:
   tscircuit-deploy:
-    name: "🚀 tscircuit Deploy"
+    name: "🚀 tscircuit deploy"
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
