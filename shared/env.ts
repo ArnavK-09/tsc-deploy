@@ -1,4 +1,7 @@
 import { z } from "zod";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const EnvSchema = z.object({
   GITHUB_BOT_TOKEN: z.string(),

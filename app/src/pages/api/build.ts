@@ -6,8 +6,6 @@ import { JobQueue } from "../../../../utils/job-queue";
 import type { BuildJobData } from "../../../../utils/job-queue";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import { extractGitHubToken } from "@/utils/auth";
-import { ulid } from "ulid";
-
 import { initializeServices } from "../../../../utils/startup";
 
 export async function POST(context: { request: Request }) {

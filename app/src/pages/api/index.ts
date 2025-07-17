@@ -2,6 +2,9 @@ import { createSuccessResponse } from "@/utils/http";
 
 export async function GET() {
   return createSuccessResponse({
-    hello: "world",
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
   });
 }

@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db, buildJobs, deployments, BuildJob, NewBuildJob } from "../db";
 import { SnapshotProcessor, BuildProgress } from "./snapshot-processor";
 import { GitHubService } from "../shared/github.service";
@@ -6,6 +6,9 @@ import { DEPLOY_URL } from "../shared/constants";
 import { generatePRComment } from "./pr-comment";
 import type { PRCommentData } from "./pr-comment";
 import { env } from "../shared/env";
+import fs from "node:fs";
+import path from "node:path";
+import { FileHandler } from "./file-handler";
 
 export interface BuildJobData {
   deploymentId: string;
@@ -147,7 +150,9 @@ export class JobQueue {
 
       console.log(`Starting to download repository for job ${job.id}`);
       workingDirectory = await this.downloadRepository(jobData);
-      console.log(`Repository downloaded for job ${job.id} to ${workingDirectory}`);
+      console.log(
+        `Repository downloaded for job ${job.id} to ${workingDirectory}`,
+      );
 
       await this.updateJobProgress(
         job.id,
@@ -182,7 +187,7 @@ export class JobQueue {
       console.error(`Job ${job.id} failed:`, error);
 
       // Check if this is a non-retryable error
-      const isNonRetryable = 
+      const isNonRetryable =
         errorMessage.includes("404 Not Found") ||
         errorMessage.includes("403 Forbidden") ||
         errorMessage.includes("repository may be private") ||
@@ -202,11 +207,11 @@ export class JobQueue {
         console.log(
           `Retrying job ${job.id} (attempt ${job.retryCount + 1}/${job.maxRetries})`,
         );
-        
+
         // Add exponential backoff delay for retries
         const delayMs = Math.min(1000 * Math.pow(2, job.retryCount), 30000); // Max 30 seconds
         console.log(`Retrying job ${job.id} in ${delayMs}ms`);
-        
+
         setTimeout(async () => {
           await db
             .update(buildJobs)
@@ -219,7 +224,9 @@ export class JobQueue {
         }, delayMs);
       } else {
         if (isNonRetryable) {
-          console.log(`Job ${job.id} failed with non-retryable error: ${errorMessage}`);
+          console.log(
+            `Job ${job.id} failed with non-retryable error: ${errorMessage}`,
+          );
         } else {
           console.log(`Job ${job.id} failed after ${job.maxRetries} retries`);
         }
@@ -233,8 +240,6 @@ export class JobQueue {
   }
 
   private async downloadRepository(jobData: BuildJobData): Promise<string> {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
     const workDir = path.join("/tmp", `build-${jobData.deploymentId}`);
 
     fs.mkdirSync(workDir, { recursive: true });
@@ -254,7 +259,7 @@ export class JobQueue {
         } catch (fetchError) {
           console.warn("Fetch download failed:", fetchError);
           throw new Error(
-            `Failed to download repository: ${error}. Archive URL may be invalid or repository may be private.`,
+            `Failed to download repository: ${error}. Archive URL: ${jobData.repoArchiveUrl}`,
           );
         }
       }
@@ -275,19 +280,19 @@ export class JobQueue {
     jobData: BuildJobData,
     workDir: string,
   ): Promise<void> {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const { FileHandler } = await import("./file-handler");
-
     const archivePath = path.join(
       "/tmp",
       `archive-${jobData.deploymentId}.tar.gz`,
     );
 
     // Use Node.js fetch instead of curl for better Vercel compatibility
-    console.log(`Downloading archive from provided URL: ${jobData.repoArchiveUrl}`);
-    console.log(`Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`);
-    
+    console.log(
+      `Downloading archive from provided URL: ${jobData.repoArchiveUrl}`,
+    );
+    console.log(
+      `Using token: ${jobData.githubToken ? jobData.githubToken : "NO TOKEN"}`,
+    );
+
     const response = await fetch(jobData.repoArchiveUrl!, {
       headers: {
         Authorization: `Bearer ${jobData.githubToken}`,
@@ -296,13 +301,15 @@ export class JobQueue {
     });
 
     if (!response.ok) {
-      console.error(`Archive download failed: ${response.status} ${response.statusText}`);
+      console.error(
+        `Archive download failed: ${response.status} ${response.statusText}`,
+      );
       console.error(`URL: ${jobData.repoArchiveUrl}`);
       console.error(`Headers sent:`, {
-        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`,
+        Authorization: `token ${jobData.githubToken ? jobData.githubToken : "NO TOKEN"}`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       });
-      
+
       throw new Error(
         `Failed to download archive: ${response.status} ${response.statusText}. URL: ${jobData.repoArchiveUrl}`,
       );
@@ -337,10 +344,12 @@ export class JobQueue {
   ): Promise<void> {
     // This is a simpler fallback that downloads the archive directly
     const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/tarball/${jobData.ref}`;
-    
+
     console.log(`Attempting to download archive from: ${archiveUrl}`);
-    console.log(`Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`);
-    
+    console.log(
+      `Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + "..." : "NO TOKEN"}`,
+    );
+
     const response = await fetch(archiveUrl, {
       headers: {
         Authorization: `Bearer ${jobData.githubToken}`,
@@ -349,13 +358,15 @@ export class JobQueue {
     });
 
     if (!response.ok) {
-      console.error(`Archive download failed: ${response.status} ${response.statusText}`);
+      console.error(
+        `Archive download failed: ${response.status} ${response.statusText}`,
+      );
       console.error(`URL: ${archiveUrl}`);
       console.error(`Headers sent:`, {
-        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`,
+        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + "..." : "NO TOKEN"}`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       });
-      
+
       throw new Error(
         `Failed to download repository: ${response.status} ${response.statusText}. URL: ${archiveUrl}`,
       );
@@ -399,7 +410,9 @@ export class JobQueue {
     console.log(`Total build time: ${totalTime}s`);
 
     // Update deployment in database
-    console.log(`Updating deployment in database for deployment ID: ${jobData.deploymentId}`);
+    console.log(
+      `Updating deployment in database for deployment ID: ${jobData.deploymentId}`,
+    );
     await db
       .update(deployments)
       .set({
@@ -413,7 +426,9 @@ export class JobQueue {
       .where(eq(deployments.id, jobData.deploymentId));
 
     if (snapshot.success) {
-      console.log(`Snapshot successful for deployment ID: ${jobData.deploymentId}`);
+      console.log(
+        `Snapshot successful for deployment ID: ${jobData.deploymentId}`,
+      );
       // Update GitHub deployment status
       await userOctokit.createDeploymentStatus({
         owner: jobData.owner,
@@ -423,12 +438,16 @@ export class JobQueue {
         description: `Successfully built ${snapshot.circuitFiles.length} circuit${snapshot.circuitFiles.length === 1 ? "" : "s"} in ${totalTime}s`,
         logUrl: `${jobData.context.serverUrl}/${jobData.owner}/${jobData.repo}/actions/runs/${jobData.context.runId}`,
       });
-      console.log(`GitHub deployment status updated for deployment ID: ${jobData.deploymentId_github}`);
+      console.log(
+        `GitHub deployment status updated for deployment ID: ${jobData.deploymentId_github}`,
+      );
 
       // Generate and post PR comment for pull requests
       if (jobData.eventType === "pull_request") {
         try {
-          console.log(`Generating PR comment for deployment ID: ${jobData.deploymentId}`);
+          console.log(
+            `Generating PR comment for deployment ID: ${jobData.deploymentId}`,
+          );
           const prCommentData: PRCommentData = {
             deploymentId: jobData.deploymentId,
             previewUrl: `${DEPLOY_URL}/deployments/${jobData.deploymentId_github}`,
@@ -447,7 +466,9 @@ export class JobQueue {
             body: prComment,
           });
 
-          console.log(`PR comment posted for deployment ${jobData.deploymentId}`);
+          console.log(
+            `PR comment posted for deployment ${jobData.deploymentId}`,
+          );
         } catch (error) {
           console.error("Failed to post PR comment:", error);
         }
@@ -456,7 +477,9 @@ export class JobQueue {
       // Update check run for pull requests
       if (jobData.checkRunId) {
         try {
-          console.log(`Updating check run for deployment ID: ${jobData.deploymentId}`);
+          console.log(
+            `Updating check run for deployment ID: ${jobData.deploymentId}`,
+          );
           await userOctokit.updateCheckRun({
             owner: jobData.owner,
             repo: jobData.repo,
@@ -471,7 +494,9 @@ export class JobQueue {
             },
           });
 
-          console.log(`Check run updated for deployment ${jobData.deploymentId}`);
+          console.log(
+            `Check run updated for deployment ${jobData.deploymentId}`,
+          );
         } catch (error) {
           console.error("Failed to update check run:", error);
         }
@@ -480,7 +505,9 @@ export class JobQueue {
       // Handle release creation for push events
       if (jobData.eventType === "push" && jobData.create_release) {
         try {
-          console.log(`Handling release creation for deployment ID: ${jobData.deploymentId}`);
+          console.log(
+            `Handling release creation for deployment ID: ${jobData.deploymentId}`,
+          );
           const branch = jobData.ref.replace("refs/heads/", "");
           if (branch === "main" || branch === "master") {
             const { tag: lastTag } = await userOctokit.getLatestTag({
@@ -511,7 +538,9 @@ export class JobQueue {
                 sha: tagSha,
               });
 
-              console.log(`Release v${packageVersion} created for deployment ${jobData.deploymentId}`);
+              console.log(
+                `Release v${packageVersion} created for deployment ${jobData.deploymentId}`,
+              );
             }
           }
         } catch (error) {
@@ -617,7 +646,6 @@ Please check your circuit files and try again.
 
   private async cleanupWorkspace(workingDirectory: string) {
     try {
-      const fs = await import("node:fs");
       fs.rmSync(workingDirectory, { recursive: true, force: true });
       console.log(`Cleaned up workspace: ${workingDirectory}`);
     } catch (error) {

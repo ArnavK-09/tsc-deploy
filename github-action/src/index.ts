@@ -57,7 +57,8 @@ async function run(): Promise<void> {
     core.info("⏱️ Start time recorded.");
 
     // Validate that this is a supported event
-    const EVENT_TYPE = context.eventName == "workflow_dispatch" ? "push" : context.eventName;
+    const EVENT_TYPE =
+      context.eventName == "workflow_dispatch" ? "push" : context.eventName;
     if (!["push", "pull_request"].includes(EVENT_TYPE)) {
       core.warning(`⚠️ Unsupported event type: ${EVENT_TYPE}`);
       core.setOutput("status", "skipped");
@@ -65,7 +66,6 @@ async function run(): Promise<void> {
     }
 
     core.info("🔍 Creating deployment...");
-
 
     const { deploymentId } = await userOctokit.createDeployment({
       owner: context.repo.owner,
@@ -112,7 +112,11 @@ async function run(): Promise<void> {
     core.info("🔍 Preparing build request...");
 
     // Create archive URL for faster download
-    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/tarball/${context.sha}`;
+    const ref =
+      EVENT_TYPE === "pull_request"
+        ? `refs/pull/${context.payload.pull_request?.number}/head`
+        : context.sha;
+    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/tarball/${ref}`;
 
     const buildRequest: SimpleBuildRequest = {
       id: ID,
@@ -139,8 +143,7 @@ async function run(): Promise<void> {
       },
       deploymentId: Number(deploymentId),
       checkRunId: checkRunId,
-      create_release:
-        EVENT_TYPE === "push" && (inputs.create_release || false),
+      create_release: EVENT_TYPE === "push" && (inputs.create_release || false),
       repoArchiveUrl,
     };
     core.info("✅ Build request prepared");
@@ -298,7 +301,9 @@ async function waitForBuildCompletion(
           throw new Error("Build was cancelled");
         }
       } else {
-        throw new Error(`Build failed: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Build failed: ${response.status} ${response.statusText}`,
+        );
       }
     } catch (error) {
       throw new Error(`Build failed: ${error}`);
