@@ -329,7 +329,7 @@ export class JobQueue {
     workDir: string,
   ): Promise<void> {
     // This is a simpler fallback that downloads the archive directly
-    const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/zipball/${jobData.ref}.tar.gz`;
+    const archiveUrl = `https://api.github.com/repos/${jobData.owner}/${jobData.repo}/tarball/${jobData.ref}`;
     
     console.log(`Attempting to download archive from: ${archiveUrl}`);
     console.log(`Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`);
