@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { create as createTar } from "tar";
+import { create as createTar, extract as extractTar } from "tar";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 export interface FileChunk {
@@ -157,26 +157,17 @@ export class FileHandler {
     outputPath: string,
   ): Promise<void> {
     try {
-      if (createTar) {
-        console.log(
-          `Compressing directory ${dirPath} to ${outputPath} using tar package`,
-        );
-        await createTar(
-          {
-            file: outputPath,
-            gzip: true,
-            cwd: path.dirname(dirPath),
-          },
-          [path.basename(dirPath)],
-        );
-      } else {
-        // Fallback to shell command
-        console.log(
-          `Compressing directory ${dirPath} to ${outputPath} using shell command`,
-        );
-        const tarCommand = `tar -czf "${outputPath}" -C "${path.dirname(dirPath)}" "${path.basename(dirPath)}"`;
-        await execAsync(tarCommand);
-      }
+      console.log(
+        `Compressing directory ${dirPath} to ${outputPath} using tar package`,
+      );
+      await createTar(
+        {
+          file: outputPath,
+          gzip: true,
+          cwd: path.dirname(dirPath),
+        },
+        [path.basename(dirPath)],
+      );
     } catch (error) {
       throw new Error(`Failed to compress directory: ${error}`);
     }
@@ -188,12 +179,13 @@ export class FileHandler {
   ): Promise<void> {
     try {
       console.log(
-        `Extracting archive from ${archivePath} to ${outputDir} using shell command`,
+        `Extracting archive from ${archivePath} to ${outputDir} using tar package`,
       );
-      fs.mkdirSync(outputDir, { recursive: true });
-
-      const extractCommand = `tar -xzf "${archivePath}" -C "${outputDir}"`;
-      await execAsync(extractCommand);
+      await extractTar({
+        file: archivePath,
+        cwd: outputDir,
+        strip: 0,
+      });
     } catch (error) {
       throw new Error(`Failed to extract archive: ${error}`);
     }
