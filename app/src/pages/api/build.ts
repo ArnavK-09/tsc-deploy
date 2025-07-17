@@ -1,5 +1,5 @@
 import { SimpleBuildRequestSchema } from "../../../../shared/types";
-import { db, deployments } from "../../../../db";
+import { db, deployments, withDatabaseErrorHandling } from "../../../../db";
 import type { NewDeployment } from "../../../../db";
 import { GitHubService } from "../../../../shared/github.service";
 import { JobQueue } from "../../../../utils/job-queue";
@@ -47,7 +47,11 @@ export async function POST(context: { request: Request }) {
       status: "pending",
     };
 
-    await db.insert(deployments).values(newDeployment);
+    // Insert deployment with database error handling
+    await withDatabaseErrorHandling(
+      () => db.insert(deployments).values(newDeployment),
+      "creating deployment record",
+    );
 
     const buildJobData: BuildJobData = {
       deploymentId: buildRequest.id,
@@ -80,6 +84,13 @@ export async function POST(context: { request: Request }) {
   } catch (error) {
     console.error("Error processing build request:", error);
     if (error instanceof Error) {
+      // Return more specific error message for database issues
+      if (error.message.includes("Database authentication failed")) {
+        return createErrorResponse(
+          "Database connection failed. Please check server configuration.",
+          500,
+        );
+      }
       return createErrorResponse(`Build request failed: ${error.message}`, 500);
     }
     return createErrorResponse("Internal server error", 500);

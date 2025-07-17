@@ -1,4 +1,4 @@
-import { db, deployments } from "../../../../db";
+import { db, deployments, buildJobs, buildArtifacts } from "../../../../db";
 import { desc, eq, and, sql } from "drizzle-orm";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import type { DeploymentView } from "../../../../shared/types";
@@ -28,6 +28,27 @@ export async function GET(context: { request: Request }) {
         return createErrorResponse("Deployment not found", 404);
       }
 
+      // Get artifact count for this deployment
+      let artifactCount = 0;
+      try {
+        const [job] = await db
+          .select({ id: buildJobs.id })
+          .from(buildJobs)
+          .where(eq(buildJobs.deploymentId, id))
+          .limit(1);
+
+        if (job) {
+          const [{ count }] = await db
+            .select({ count: sql<number>`cast(count(*) as integer)` })
+            .from(buildArtifacts)
+            .where(eq(buildArtifacts.jobId, job.id));
+
+          artifactCount = count || 0;
+        }
+      } catch (error) {
+        console.warn("Could not fetch artifact count:", error);
+      }
+
       const deploymentView: DeploymentView = {
         id: deployment.id,
         owner: deployment.owner,
@@ -46,6 +67,8 @@ export async function GET(context: { request: Request }) {
       return createSuccessResponse({
         deployment: deploymentView,
         snapshotResult: deployment.snapshotResult,
+        artifactCount,
+        hasArtifacts: artifactCount > 0,
       });
     }
 

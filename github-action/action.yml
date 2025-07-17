@@ -1,4 +1,4 @@
-name: "tscircuit Deploy"
+name: "tscircuit deploy"
 description: "Deploy tscircuit projects with automatic preview builds and semantic versioning"
 author: "tscircuit"
 branding:

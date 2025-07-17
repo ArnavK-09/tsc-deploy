@@ -45,28 +45,13 @@ export class SnapshotProcessor {
     const files: string[] = [];
 
     try {
-      const { stdout } = await execAsync(
-        'find . -name "*.circuit.tsx" -o -name "*.circuit.ts" -o -name "*.board.tsx"',
-        { cwd: this.workingDirectory },
+      const manualFiles = await this.findCircuitFilesManually(
+        this.workingDirectory,
       );
-
-      const foundFiles = stdout
-        .trim()
-        .split("\n")
-        .filter((f) => f.length > 0 && f !== ".");
-      files.push(...foundFiles);
-    } catch (error) {
-      console.warn(`Failed to find circuit files with find command: ${error}`);
-
-      try {
-        const manualFiles = await this.findCircuitFilesManually(
-          this.workingDirectory,
-        );
-        files.push(...manualFiles);
-        console.log("Files found:", manualFiles);
-      } catch (fallbackError) {
-        console.warn(`Manual file search also failed: ${fallbackError}`);
-      }
+      files.push(...manualFiles);
+      console.log("Files found:", manualFiles);
+    } catch (fallbackError) {
+      console.warn(`Manual file search also failed: ${fallbackError}`);
     }
 
     this.updateProgress("discovery", 20, `Found ${files.length} circuit files`);

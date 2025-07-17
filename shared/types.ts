@@ -102,6 +102,8 @@ export const DeploymentViewSchema = z.object({
   createdAt: z.string(),
   buildCompletedAt: z.string().nullable(),
   errorMessage: z.string().nullable(),
+  artifactCount: z.number().optional(),
+  hasArtifacts: z.boolean().optional(),
 });
 
 export type DeploymentView = z.infer<typeof DeploymentViewSchema>;
