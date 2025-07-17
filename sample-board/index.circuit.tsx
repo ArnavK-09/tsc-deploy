@@ -1,5 +1,5 @@
-import { sel } from "tscircuit"
-import { MCP4725A1T_E_CH } from "./MCP4725A1T_E_CH"
+import { sel } from "tscircuit";
+import { MCP4725A1T_E_CH } from "./MCP4725A1T_E_CH";
 
 const I2CDACBREAKOUT = () => (
   <board width="15mm" height="15.24mm">
@@ -210,6 +210,6 @@ const I2CDACBREAKOUT = () => (
     <hole name="MH1" diameter="3.302mm" pcbX="5.715mm" pcbY="5.715mm" />
     <hole name="MH1-2" diameter="3.302mm" pcbX="5.715mm" pcbY="-5.715mm" />
   </board>
-)
+);
 
-export default I2CDACBREAKOUT
+export default I2CDACBREAKOUT;

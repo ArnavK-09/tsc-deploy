@@ -1,0 +1,500 @@
+---
+// Fetch deployments data
+const DEPLOY_URL = process.env.DEPLOY_URL || 'http://localhost:3000';
+
+let deploymentsData = null;
+let error = null;
+
+try {
+  const response = await fetch(`${DEPLOY_URL}/api/deployments?limit=50`);
+  if (response.ok) {
+    deploymentsData = await response.json();
+  } else {
+    error = `Failed to fetch deployments: ${response.status}`;
+  }
+} catch (e) {
+  error = `Error fetching deployments: ${e.message}`;
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>tscircuit Deploy Dashboard</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 3rem;
+        color: white;
+      }
+
+      .header h1 {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+
+      .header p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+      }
+
+      .stat-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+        text-align: center;
+      }
+
+      .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #4f46e5;
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .filters {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+      }
+
+      .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        align-items: end;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .filter-group label {
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #374151;
+      }
+
+      .filter-group select,
+      .filter-group input {
+        padding: 0.75rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+      }
+
+      .filter-group select:focus,
+      .filter-group input:focus {
+        outline: none;
+        border-color: #4f46e5;
+      }
+
+      .deployments-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+      }
+
+      .deployments-header {
+        background: #f8fafc;
+        padding: 1.5rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .deployments-header h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1e293b;
+      }
+
+      .deployments-list {
+        max-height: 600px;
+        overflow-y: auto;
+      }
+
+      .deployment-item {
+        padding: 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.2s;
+      }
+
+      .deployment-item:hover {
+        background-color: #f8fafc;
+      }
+
+      .deployment-item:last-child {
+        border-bottom: none;
+      }
+
+      .deployment-header {
+        display: flex;
+        justify-content: between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+      }
+
+      .deployment-title {
+        flex: 1;
+      }
+
+      .deployment-title h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+      }
+
+      .deployment-subtitle {
+        font-size: 0.9rem;
+        color: #64748b;
+      }
+
+      .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .status-ready {
+        background-color: #dcfce7;
+        color: #166534;
+      }
+
+      .status-pending {
+        background-color: #fef3c7;
+        color: #92400e;
+      }
+
+      .status-error {
+        background-color: #fee2e2;
+        color: #991b1b;
+      }
+
+      .deployment-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .detail-item {
+        font-size: 0.9rem;
+      }
+
+      .detail-label {
+        color: #6b7280;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+      }
+
+      .detail-value {
+        color: #374151;
+      }
+
+      .deployment-actions {
+        margin-top: 1rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background-color: #4f46e5;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background-color: #4338ca;
+      }
+
+      .btn-secondary {
+        background-color: #e5e7eb;
+        color: #374151;
+      }
+
+      .btn-secondary:hover {
+        background-color: #d1d5db;
+      }
+
+      .error-message {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6b7280;
+      }
+
+      .empty-state h3 {
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          padding: 1rem;
+        }
+
+        .header h1 {
+          font-size: 2rem;
+        }
+
+        .filter-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .deployment-details {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>⚡ tscircuit Deploy</h1>
+        <p>Deployment Dashboard & Circuit Previews</p>
+      </div>
+
+      {error && (
+        <div class="error-message">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {deploymentsData && (
+        <>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number">{deploymentsData.pagination?.totalCount || 0}</div>
+              <div class="stat-label">Total Deployments</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">
+                {deploymentsData.deployments?.filter(d => d.status === 'ready').length || 0}
+              </div>
+              <div class="stat-label">Successful</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">
+                {deploymentsData.deployments?.filter(d => d.status === 'pending').length || 0}
+              </div>
+              <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">
+                {deploymentsData.deployments?.filter(d => d.status === 'error').length || 0}
+              </div>
+              <div class="stat-label">Failed</div>
+            </div>
+          </div>
+
+          <div class="filters">
+            <div class="filter-grid">
+              <div class="filter-group">
+                <label for="owner-filter">Repository Owner</label>
+                <input type="text" id="owner-filter" placeholder="e.g., tscircuit" />
+              </div>
+              <div class="filter-group">
+                <label for="repo-filter">Repository Name</label>
+                <input type="text" id="repo-filter" placeholder="e.g., my-circuit" />
+              </div>
+              <div class="filter-group">
+                <label for="status-filter">Status</label>
+                <select id="status-filter">
+                  <option value="">All Statuses</option>
+                  <option value="ready">Ready</option>
+                  <option value="pending">Pending</option>
+                  <option value="error">Error</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn btn-primary" onclick="applyFilters()">
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="deployments-container">
+            <div class="deployments-header">
+              <h2>Recent Deployments</h2>
+            </div>
+            
+            <div class="deployments-list">
+              {deploymentsData.deployments?.length > 0 ? (
+                deploymentsData.deployments.map((deployment) => (
+                  <div class="deployment-item">
+                    <div class="deployment-header">
+                      <div class="deployment-title">
+                        <h3>
+                          {deployment.owner}/{deployment.repo}
+                        </h3>
+                        <div class="deployment-subtitle">
+                          {deployment.metaType === 'pull_request' ? `PR #${deployment.meta}` : `Push to ${deployment.meta}`} • 
+                          <span class="truncate">{deployment.commitSha.substring(0, 7)}</span>
+                        </div>
+                      </div>
+                      <div class={`status-badge status-${deployment.status}`}>
+                        {deployment.status}
+                      </div>
+                    </div>
+
+                    <div class="deployment-details">
+                      <div class="detail-item">
+                        <div class="detail-label">Circuits</div>
+                        <div class="detail-value">{deployment.totalCircuitFiles}</div>
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Build Time</div>
+                        <div class="detail-value">
+                          {deployment.buildDuration ? `${deployment.buildDuration}s` : 'N/A'}
+                        </div>
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Created</div>
+                        <div class="detail-value">
+                          {new Date(deployment.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Deployment ID</div>
+                        <div class="detail-value truncate">{deployment.id}</div>
+                      </div>
+                    </div>
+
+                    {deployment.errorMessage && (
+                      <div style="margin-top: 1rem; padding: 0.75rem; background: #fef2f2; border-radius: 6px; font-size: 0.9rem; color: #991b1b;">
+                        <strong>Error:</strong> {deployment.errorMessage}
+                      </div>
+                    )}
+
+                    <div class="deployment-actions">
+                      <a href={`/deployments/${deployment.id}`} class="btn btn-primary">
+                        View Details
+                      </a>
+                      {deployment.status === 'ready' && (
+                        <a href={`/deployments/${deployment.id}/preview`} class="btn btn-secondary">
+                          Preview Circuits
+                        </a>
+                      )}
+                      <a href={`https://github.com/${deployment.owner}/${deployment.repo}/commit/${deployment.commitSha}`} 
+                         class="btn btn-secondary" target="_blank" rel="noopener">
+                        View Commit
+                      </a>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div class="empty-state">
+                  <h3>No deployments found</h3>
+                  <p>Deployments will appear here once you start using tscircuit deploy.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+
+    <script>
+      function applyFilters() {
+        const owner = document.getElementById('owner-filter').value;
+        const repo = document.getElementById('repo-filter').value;
+        const status = document.getElementById('status-filter').value;
+
+        const params = new URLSearchParams();
+        if (owner) params.set('owner', owner);
+        if (repo) params.set('repo', repo);
+        if (status) params.set('status', status);
+
+        const baseUrl = window.location.pathname;
+        const newUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+        
+        window.location.href = newUrl;
+      }
+
+      // Auto-refresh pending deployments
+      if (window.location.search.includes('autoRefresh=true') || 
+          document.querySelector('.status-pending')) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 30000); // Refresh every 30 seconds
+      }
+    </script>
+  </body>
+</html>

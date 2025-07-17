@@ -1,6 +1,7 @@
-name: Simple tscircuit Deploy
+name: Sample tscircuit Deploy
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -10,29 +11,30 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 10
+
     permissions:
       contents: read
       pull-requests: write
       deployments: write
       statuses: write
-    
+      checks: write
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
-      
-      - name: Build tscircuit
-        working-directory: ./packages/github-action
+
+      - name: Build tscircuit action
         run: |
           bun install
-          bun run build
+          cd github-action && bun tsup
 
       - name: Deploy tscircuit
-        uses: ./packages/github-action
+        uses: ./github-action
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          args: 'deploy --verbose'
-          timeout: '10'
-          working-directory: '.' 
+          working-directory: "."
+          deploy-server-url: https://tsc-deploy.vercel.app
+          create-release: false
