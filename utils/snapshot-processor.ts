@@ -267,11 +267,15 @@ export class SnapshotProcessor {
       const totalFiles = circuitFiles.length;
       result.circuitFiles = await Promise.all(
         circuitFiles.map(async (file, index) => {
+          console.log(`Starting processing of file: ${file}`);
           const fileProgress = Math.round(((index + 1) / totalFiles) * 70) + 25;
           this.updateProgress("processing", fileProgress, `Processing ${file}`);
 
           const circuitJson = await this.generateCircuitJson(file);
+          console.log(`Generated circuit JSON for file: ${file}`);
+
           const metadata = await this.getFileMetadata(file);
+          console.log(`Retrieved metadata for file: ${file}`);
 
           const circuitFile: CircuitFile = {
             path: file,
@@ -280,6 +284,7 @@ export class SnapshotProcessor {
             metadata,
           };
 
+          console.log(`Completed processing of file: ${file}`);
           return circuitFile;
         }),
       );

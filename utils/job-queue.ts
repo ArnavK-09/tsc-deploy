@@ -286,7 +286,7 @@ export class JobQueue {
 
     // Use Node.js fetch instead of curl for better Vercel compatibility
     console.log(`Downloading archive from provided URL: ${jobData.repoArchiveUrl}`);
-    console.log(`Using token: ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`);
+    console.log(`Using token: ${jobData.githubToken ? jobData.githubToken : 'NO TOKEN'}`);
     
     const response = await fetch(jobData.repoArchiveUrl!, {
       headers: {
@@ -299,7 +299,7 @@ export class JobQueue {
       console.error(`Archive download failed: ${response.status} ${response.statusText}`);
       console.error(`URL: ${jobData.repoArchiveUrl}`);
       console.error(`Headers sent:`, {
-        Authorization: `token ${jobData.githubToken ? jobData.githubToken.substring(0, 8) + '...' : 'NO TOKEN'}`,
+        Authorization: `token ${jobData.githubToken ? jobData.githubToken : 'NO TOKEN'}`,
         "User-Agent": "tscircuit-deploy/1.0.0",
       });
       

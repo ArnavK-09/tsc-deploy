@@ -112,7 +112,8 @@ async function run(): Promise<void> {
     core.info("🔍 Preparing build request...");
 
     // Create archive URL for faster download
-    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/tarball/${context.sha}`;
+    const ref = EVENT_TYPE === "pull_request" ? `refs/pull/${context.payload.pull_request?.number}/head` : context.sha;
+    const repoArchiveUrl = `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/tarball/${ref}`;
 
     const buildRequest: SimpleBuildRequest = {
       id: ID,
