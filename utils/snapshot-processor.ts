@@ -195,7 +195,7 @@ export class SnapshotProcessor {
     lastModified: string;
     checksum: string;
   }> {
-    const absolutePath = path.resolve(this.workingDirectory, filePath);
+    const absolutePath = path.resolve(filePath);
     const stats = fs.statSync(absolutePath);
     const content = fs.readFileSync(absolutePath, "utf-8");
     const checksum = createHash("sha256").update(content).digest("hex");
@@ -215,7 +215,7 @@ export class SnapshotProcessor {
     }
   }
 
-  async generateSnapshot(): Promise<SnapshotResult> {
+  async generateSnapshot(deploymentId: string): Promise<SnapshotResult> {
     const startTime = Date.now();
     const result: SnapshotResult = {
       circuitFiles: [],
@@ -260,7 +260,7 @@ export class SnapshotProcessor {
           console.log(`Retrieved metadata for file: ${file}`);
 
           const circuitFile: CircuitFile = {
-            path: file,
+            path: file.split(`tmp/build-${deploymentId}`)[1] || file,
             name: path.basename(file),
             circuitJson,
             metadata,

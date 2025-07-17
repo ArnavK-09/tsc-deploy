@@ -169,7 +169,7 @@ export class JobQueue {
       );
 
       console.log(`Starting build for job ${job.id}`);
-      const snapshot = await this.buildProject(job.id, workingDirectory);
+      const snapshot = await this.buildProject(job, workingDirectory);
       console.log(`Build completed for job ${job.id}, snapshot created`);
 
       await this.updateJobProgress(job.id, 90, "Finalizing deployment...");
@@ -389,18 +389,18 @@ export class JobQueue {
     );
   }
 
-  private async buildProject(jobId: string, workingDirectory: string) {
+  private async buildProject(job: BuildJob, workingDirectory: string) {
     const processor = new SnapshotProcessor(
       workingDirectory,
       (progress: BuildProgress) => {
         const overallProgress = Math.round(progress.progress * 0.7 + 20);
-        this.updateJobProgress(jobId, overallProgress, progress.message).catch(
+        this.updateJobProgress(job.id, overallProgress, progress.message).catch(
           console.error,
         );
       },
     );
 
-    return await processor.generateSnapshot();
+    return await processor.generateSnapshot(job.deploymentId);
   }
 
   private async saveBuildArtifacts(
