@@ -209,6 +209,26 @@ async function run(): Promise<void> {
     const previewUrl = `${DEPLOY_URL}/deployments/${deploymentId}`;
     core.setOutput("preview-url", previewUrl);
 
+    // Create a summary for the job
+    const statusEmoji = buildResult.status === "completed" ? "✅" : "❌";
+    const summary = `
+## ${statusEmoji} tscircuit Deploy ${buildResult.status === "completed" ? "Successful" : "Failed"}
+
+| Property | Value |
+|----------|-------|
+| 🆔 Deployment ID | \`${deploymentId}\` |
+| 🔗 Job ID | \`${jobId}\` |
+| ⏱️ Build Time | ${totalTime}s |
+| 🔢 Circuits Found | ${buildResult.circuitCount || 0} |
+| 🔗 Preview URL | [View Deployment](${previewUrl}) |
+| 📊 Status | \`${buildResult.status}\` |
+
+${buildResult.status === "completed" ? "🎉 Your circuits have been successfully deployed and are ready for preview!" : "⚠️ Deployment failed. Check the logs above for details."}
+    `;
+
+    core.summary.addRaw(summary);
+    await core.summary.write();
+
     core.info(`\n✅ Build ${buildResult.status}`);
     core.info(`🆔 Deployment ID: ${deploymentId}`);
     core.info(`🔗 Job ID: ${jobId}`);
@@ -217,6 +237,24 @@ async function run(): Promise<void> {
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+
+    // Create failure summary
+    const failureSummary = `
+## ❌ tscircuit Deploy Failed
+
+| Property | Value |
+|----------|-------|
+| 🚨 Error | \`${errorMessage}\` |
+| ⏱️ Failed at | ${new Date().toISOString()} |
+| 📋 Event | \`${github.context.eventName}\` |
+| 🔗 SHA | \`${github.context.sha}\` |
+
+⚠️ The deployment process encountered an error. Please check the logs above for more details.
+    `;
+
+    core.summary.addRaw(failureSummary);
+    await core.summary.write();
+
     core.error(error as Error);
     core.setFailed(`☠️ Workflow failed: ${errorMessage}`);
     process.exit(1);
