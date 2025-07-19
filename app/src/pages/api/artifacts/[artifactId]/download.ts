@@ -14,7 +14,6 @@ export async function GET(context: {
   const { artifactId } = context.params;
 
   try {
-    // Get the artifact with deployment info
     const [result] = await db
       .select({
         artifact: buildArtifacts,
@@ -33,28 +32,22 @@ export async function GET(context: {
 
     const { artifact, deploymentId, snapshotResult } = result;
 
-    // Find the circuit file data in the snapshot result
     const snapshotData = snapshotResult as any;
     if (!snapshotData || !snapshotData.circuitFiles) {
       return createErrorResponse("Circuit data not found in deployment", 404);
     }
 
-    // Find the matching circuit file by name or path
     const circuitFile = snapshotData.circuitFiles.find(
       (file: any) =>
-        file.name === artifact.fileName ||
-        file.path === artifact.filePath ||
-        file.path === (artifact.metadata as any)?.originalPath,
+        file.name === artifact.fileName || file.path === artifact.filePath,
     );
 
     if (!circuitFile || !circuitFile.circuitJson) {
       return createErrorResponse("Circuit JSON not found", 404);
     }
 
-    // Generate the circuit JSON content
     const circuitJsonString = JSON.stringify(circuitFile.circuitJson, null, 2);
 
-    // Return the file with appropriate headers
     return new Response(circuitJsonString, {
       headers: {
         "Content-Type": "application/json",
@@ -63,12 +56,10 @@ export async function GET(context: {
           circuitJsonString,
           "utf8",
         ).toString(),
-        "Cache-Control": "public, max-age=86400", // Cache for 24 hours
+        "Cache-Control": "public, max-age=86400",
         "X-Artifact-Id": artifactId,
         "X-Deployment-Id": deploymentId,
-        "X-File-Type": artifact.fileType,
-        "X-Original-Path":
-          (artifact.metadata as any)?.originalPath || artifact.filePath,
+        "X-Original-Path": artifact.filePath,
       },
     });
   } catch (error) {

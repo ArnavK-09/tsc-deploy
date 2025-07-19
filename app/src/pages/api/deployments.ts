@@ -16,7 +16,6 @@ export async function GET(context: { request: Request }) {
     const status = url.searchParams.get("status");
     const id = url.searchParams.get("id");
 
-    // If specific deployment ID is requested
     if (id) {
       const [deployment] = await db
         .select()
@@ -28,7 +27,6 @@ export async function GET(context: { request: Request }) {
         return createErrorResponse("Deployment not found", 404);
       }
 
-      // Get artifact count for this deployment
       let artifactCount = 0;
       try {
         const [job] = await db
@@ -61,7 +59,6 @@ export async function GET(context: { request: Request }) {
         totalCircuitFiles: deployment.totalCircuitFiles || 0,
         createdAt: deployment.createdAt.toISOString(),
         buildCompletedAt: deployment.buildCompletedAt?.toISOString() || null,
-        errorMessage: deployment.errorMessage,
       };
 
       return createSuccessResponse({
@@ -72,7 +69,6 @@ export async function GET(context: { request: Request }) {
       });
     }
 
-    // Build query conditions
     const conditions = [];
     if (owner) conditions.push(eq(deployments.owner, owner));
     if (repo) conditions.push(eq(deployments.repo, repo));
@@ -80,7 +76,6 @@ export async function GET(context: { request: Request }) {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Get deployments with pagination
     const allDeployments = await db
       .select()
       .from(deployments)
@@ -89,7 +84,6 @@ export async function GET(context: { request: Request }) {
       .limit(limit)
       .offset((page - 1) * limit);
 
-    // Transform to view format
     const deploymentViews: DeploymentView[] = allDeployments.map(
       (deployment) => ({
         id: deployment.id,
@@ -103,11 +97,9 @@ export async function GET(context: { request: Request }) {
         totalCircuitFiles: deployment.totalCircuitFiles || 0,
         createdAt: deployment.createdAt.toISOString(),
         buildCompletedAt: deployment.buildCompletedAt?.toISOString() || null,
-        errorMessage: deployment.errorMessage,
       }),
     );
 
-    // Get total count for pagination
     const [{ count: totalCount }] = await db
       .select({ count: sql<number>`cast(count(*) as integer)` })
       .from(deployments)

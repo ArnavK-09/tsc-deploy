@@ -2,8 +2,8 @@ name: Sample tscircuit Deploy
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   pull_request:
     types: [opened, reopened, synchronize]
     branches: [main]
@@ -37,5 +37,4 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: "."
-          deploy-server-url: https://tsc-deploy.vercel.app
           create-release: false

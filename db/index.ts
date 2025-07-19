@@ -2,16 +2,13 @@ import { drizzle } from "drizzle-orm/vercel-postgres";
 import { sql } from "@vercel/postgres";
 import { deployments, buildJobs, buildArtifacts } from "./schema";
 
-// Create database instance with error handling
 let dbInstance: ReturnType<typeof drizzle>;
 
 try {
-  // Validate DATABASE_URL exists
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  // Create the database connection
   dbInstance = drizzle(sql, {
     logger: process.env.NODE_ENV === "development",
   });
@@ -24,13 +21,11 @@ try {
 
 export const db = dbInstance;
 
-// Database health check function
 export async function checkDatabaseConnection(): Promise<{
   healthy: boolean;
   error?: string;
 }> {
   try {
-    // Simple query to test connection
     await sql`SELECT 1 as test`;
     return { healthy: true };
   } catch (error) {
@@ -41,7 +36,6 @@ export async function checkDatabaseConnection(): Promise<{
   }
 }
 
-// Wrapper function for database operations with retry logic
 export async function withDatabaseErrorHandling<T>(
   operation: () => Promise<T>,
   context = "database operation",
@@ -50,14 +44,12 @@ export async function withDatabaseErrorHandling<T>(
     return await operation();
   } catch (error) {
     if (error instanceof Error) {
-      // Log detailed error information
       console.error(`❌ Database error in ${context}:`, {
         message: error.message,
         stack: error.stack,
         name: error.name,
       });
 
-      // Check if it's a connection-related error
       if (
         error.message.includes("SASL") ||
         error.message.includes("authentication")
@@ -67,7 +59,6 @@ export async function withDatabaseErrorHandling<T>(
         );
       }
 
-      // Re-throw with additional context
       throw new Error(
         `Database operation failed in ${context}: ${error.message}`,
       );

@@ -3,7 +3,7 @@ import { z } from "zod";
 export const CircuitFileSchema = z.object({
   path: z.string(),
   name: z.string(),
-  circuitJson: z.any(), // Store the actual circuit JSON
+  circuitJson: z.any(),
   metadata: z
     .object({
       fileSize: z.number(),
@@ -101,7 +101,6 @@ export const DeploymentViewSchema = z.object({
   totalCircuitFiles: z.number(),
   createdAt: z.string(),
   buildCompletedAt: z.string().nullable(),
-  errorMessage: z.string().nullable(),
   artifactCount: z.number().optional(),
   hasArtifacts: z.boolean().optional(),
 });

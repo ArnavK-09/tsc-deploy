@@ -1,9 +1,8 @@
-import { createSuccessResponse, createErrorResponse } from "@/utils/http";
+import { createSuccessResponse } from "@/utils/http";
 import { checkDatabaseConnection } from "../../../../db";
 
 export async function GET() {
   try {
-    // Check database connectivity
     const dbHealth = await checkDatabaseConnection();
 
     const healthData = {
