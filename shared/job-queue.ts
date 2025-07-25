@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { FileHandler } from "../utils/file-handler";
 import { SnapshotResult } from "shared/types";
-import { BuildJob } from "../prisma";
+import { BuildJob } from "@prisma/client";
 export interface BuildJobData {
   deploymentId: string;
   owner: string;
