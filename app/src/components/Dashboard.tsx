@@ -74,7 +74,7 @@ const Dashboard = () => {
       try {
         const response = await fetch("/api/deployments?limit=50");
         if (response.ok) {
-          const data = await response.json() as DeploymentsResponse;
+          const data = (await response.json()) as DeploymentsResponse;
           setDeploymentsData(data);
         } else {
           setError(`Failed to fetch deployments: ${response.status}`);
@@ -93,7 +93,7 @@ const Dashboard = () => {
       try {
         const response = await fetch("/api");
         if (response.ok) {
-          const data = await response.json() as HealthData;
+          const data = (await response.json()) as HealthData;
           setHealthData(data);
         } else {
           setHealthError(`Failed to fetch health data: ${response.status}`);
@@ -496,57 +496,59 @@ const Dashboard = () => {
                       )}
 
                       {/* Actions */}
-                      <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
                         <a
                           href={`/deployment/${deployment.id}`}
-                          className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
+                          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 text-sm shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98]"
                         >
-                          <Eye className="w-4 h-4" />
-                          <span>View Details</span>
+                          <Eye className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">Details</span>
                         </a>
                         {deployment.status === "ready" && (
                           <a
                             href={`/deployment/${deployment.id}?preview`}
-                            className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-sm"
+                            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-all duration-200 text-sm shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98]"
                           >
-                            <Play className="w-4 h-4" />
-                            <span>Preview</span>
+                            <Play className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">Preview</span>
                           </a>
                         )}
                         <a
                           href={`https://github.com/${deployment.owner}/${deployment.repo}`}
-                          className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors text-sm"
+                          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-lg transition-all duration-200 text-sm shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98]"
                           target="_blank"
                           rel="noopener noreferrer"
                           title="View repository on GitHub"
                         >
-                          <ExternalLink className="w-4 h-4" />
-                          <span className="hidden sm:inline">Repository</span>
-                          <span className="sm:hidden">Repo</span>
+                          <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate hidden sm:inline">
+                            Repository
+                          </span>
+                          <span className="truncate sm:hidden">Repo</span>
                         </a>
                         <a
                           href={`https://github.com/${deployment.owner}/${deployment.repo}/commit/${deployment.commitSha}`}
-                          className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors text-sm"
+                          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-lg transition-all duration-200 text-sm shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98]"
                           target="_blank"
                           rel="noopener noreferrer"
                           title="View commit on GitHub"
                         >
-                          <GitCommit className="w-4 h-4" />
-                          <span>Commit</span>
+                          <GitCommit className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">Commit</span>
                         </a>
                         {deployment.metaType === "pull_request" && (
                           <a
                             href={`https://github.com/${deployment.owner}/${deployment.repo}/pull/${deployment.meta}`}
-                            className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors text-sm"
+                            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-lg transition-all duration-200 text-sm shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98]"
                             target="_blank"
                             rel="noopener noreferrer"
                             title="View pull request on GitHub"
                           >
-                            <GitBranch className="w-4 h-4" />
-                            <span className="hidden sm:inline">
+                            <GitBranch className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate hidden sm:inline">
                               Pull Request
                             </span>
-                            <span className="sm:hidden">PR</span>
+                            <span className="truncate sm:hidden">PR</span>
                           </a>
                         )}
                       </div>
