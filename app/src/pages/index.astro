@@ -1,8 +1,8 @@
-packa---
+---
 // Fetch deployments data
 const DEPLOY_URL = process.env.DEPLOY_URL || 'http://localhost:3000';
 
-let deploymentsData = null;
+let deploymentsData:any = null;
 let error = null;
 
 try {
@@ -12,7 +12,8 @@ try {
   } else {
     error = `Failed to fetch deployments: ${response.status}`;
   }
-} catch (e) {
+} catch (e:any) {
+  console.error(e)
   error = `Error fetching deployments: ${e.message}`;
 }
 ---
@@ -345,19 +346,19 @@ try {
             </div>
             <div class="stat-card">
               <div class="stat-number">
-                {deploymentsData.deployments?.filter(d => d.status === 'ready').length || 0}
+                {deploymentsData.deployments?.filter((d:any) => d.status === 'ready').length || 0}
               </div>
               <div class="stat-label">Successful</div>
             </div>
             <div class="stat-card">
               <div class="stat-number">
-                {deploymentsData.deployments?.filter(d => d.status === 'pending').length || 0}
+                {deploymentsData.deployments?.filter((d:any) => d.status === 'pending').length || 0}
               </div>
               <div class="stat-label">In Progress</div>
             </div>
             <div class="stat-card">
               <div class="stat-number">
-                {deploymentsData.deployments?.filter(d => d.status === 'error').length || 0}
+                {deploymentsData.deployments?.filter((d:any) => d.status === 'error').length || 0}
               </div>
               <div class="stat-label">Failed</div>
             </div>
@@ -397,7 +398,7 @@ try {
             
             <div class="deployments-list">
               {deploymentsData.deployments?.length > 0 ? (
-                deploymentsData.deployments.map((deployment) => (
+                deploymentsData.deployments.map((deployment:any) => (
                   <div class="deployment-item">
                     <div class="deployment-header">
                       <div class="deployment-title">
@@ -470,31 +471,5 @@ try {
         </>
       )}
     </div>
-
-    <script>
-      function applyFilters() {
-        const owner = document.getElementById('owner-filter').value;
-        const repo = document.getElementById('repo-filter').value;
-        const status = document.getElementById('status-filter').value;
-
-        const params = new URLSearchParams();
-        if (owner) params.set('owner', owner);
-        if (repo) params.set('repo', repo);
-        if (status) params.set('status', status);
-
-        const baseUrl = window.location.pathname;
-        const newUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
-        
-        window.location.href = newUrl;
-      }
-
-      // Auto-refresh pending deployments
-      if (window.location.search.includes('autoRefresh=true') || 
-          document.querySelector('.status-pending')) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 30000); // Refresh every 30 seconds
-      }
-    </script>
 	</body>
 </html>
