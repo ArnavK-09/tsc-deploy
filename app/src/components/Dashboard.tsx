@@ -9,6 +9,12 @@ import {
   GitCommit,
   Clock,
   Package,
+  Activity,
+  Database,
+  Server,
+  Cpu,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 
 interface Deployment {
@@ -32,11 +38,36 @@ interface DeploymentsResponse {
   };
 }
 
+interface HealthData {
+  status: "healthy" | "unhealthy";
+  timestamp: string;
+  uptime: number;
+  memory: {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+    arrayBuffers: number;
+  };
+  database: {
+    connected: boolean;
+    error?: string;
+  };
+  environment: {
+    nodeEnv: string;
+    hasDatabaseUrl: boolean;
+    databaseUrlHost: string;
+  };
+}
+
 const Dashboard = () => {
   const [deploymentsData, setDeploymentsData] =
     useState<DeploymentsResponse | null>(null);
+  const [healthData, setHealthData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [healthLoading, setHealthLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDeployments = async () => {
@@ -58,7 +89,31 @@ const Dashboard = () => {
       }
     };
 
+    const fetchHealth = async () => {
+      try {
+        const response = await fetch("/api");
+        if (response.ok) {
+          const data = await response.json();
+          setHealthData(data);
+        } else {
+          setHealthError(`Failed to fetch health data: ${response.status}`);
+        }
+      } catch (e) {
+        console.error(e);
+        setHealthError(
+          `Error fetching health data: ${e instanceof Error ? e.message : "Unknown error"}`,
+        );
+      } finally {
+        setHealthLoading(false);
+      }
+    };
+
     fetchDeployments();
+    fetchHealth();
+
+    // Refresh health data every 30 seconds
+    const healthInterval = setInterval(fetchHealth, 30000);
+    return () => clearInterval(healthInterval);
   }, []);
 
   if (loading) {
@@ -87,6 +142,186 @@ const Dashboard = () => {
             <p className="text-slate-600">Monitor your circuit deployments</p>
           </div>
         </div>
+      </div>
+
+      {/* System Health Status */}
+      <div className="mb-8">
+        <div className="flex items-center space-x-3 mb-4">
+          <Activity className="w-5 h-5 text-blue-600" />
+          <h2 className="text-xl font-semibold text-slate-900">
+            System Health
+          </h2>
+        </div>
+
+        {healthLoading ? (
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="flex items-center space-x-3">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+              <span className="text-slate-600">Loading health status...</span>
+            </div>
+          </div>
+        ) : healthError ? (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-center space-x-2 text-red-700">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-medium">Health Check Error:</span>
+            </div>
+            <p className="text-red-600 mt-1">{healthError}</p>
+          </div>
+        ) : healthData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Overall Status */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-center">
+              <div className="flex items-center space-x-3 mb-2">
+                {healthData.status === "healthy" ? (
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                ) : (
+                  <XCircle className="w-6 h-6 text-red-600" />
+                )}
+                <div>
+                  <div
+                    className={`text-lg font-bold ${
+                      healthData.status === "healthy"
+                        ? "text-green-700"
+                        : "text-red-700"
+                    }`}
+                  >
+                    {healthData.status === "healthy" ? "Healthy" : "Unhealthy"}
+                  </div>
+                  <div className="text-sm text-slate-600">System Status</div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>Health</span>
+                  <span>{healthData.status === "healthy" ? "100%" : "0%"}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      healthData.status === "healthy"
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }`}
+                    style={{
+                      width: healthData.status === "healthy" ? "100%" : "0%",
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Database Status */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-center">
+              <div className="flex items-center space-x-3 mb-2">
+                <Database
+                  className={`w-6 h-6 ${
+                    healthData.database.connected
+                      ? "text-blue-600"
+                      : "text-red-600"
+                  }`}
+                />
+                <div>
+                  <div
+                    className={`text-lg font-bold ${
+                      healthData.database.connected
+                        ? "text-blue-700"
+                        : "text-red-700"
+                    }`}
+                  >
+                    {healthData.database.connected
+                      ? "Connected"
+                      : "Disconnected"}
+                  </div>
+                  <div className="text-sm text-slate-600">Database</div>
+                </div>
+              </div>
+              {healthData.database.error && (
+                <div className="text-xs text-red-600 mt-2 font-mono">
+                  {healthData.database.error}
+                </div>
+              )}
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>Connection</span>
+                  <span>{healthData.database.connected ? "100%" : "0%"}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      healthData.database.connected
+                        ? "bg-blue-500"
+                        : "bg-red-500"
+                    }`}
+                    style={{
+                      width: healthData.database.connected ? "100%" : "0%",
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Uptime */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-center">
+              <div className="flex items-center space-x-3 mb-2">
+                <Server className="w-6 h-6 text-purple-600" />
+                <div>
+                  <div className="text-lg font-bold text-slate-900">
+                    {Math.floor(healthData.uptime / 3600)}h{" "}
+                    {Math.floor((healthData.uptime % 3600) / 60)}m
+                  </div>
+                  <div className="text-sm text-slate-600">Uptime</div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>Stability</span>
+                  <span>98%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: "98%" }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Memory Usage */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-center">
+              <div className="flex items-center space-x-3 mb-2">
+                <Cpu className="w-6 h-6 text-orange-600" />
+                <div>
+                  <div className="text-lg font-bold text-slate-900">
+                    {Math.round(healthData.memory.heapUsed / 1024 / 1024)}MB
+                  </div>
+                  <div className="text-sm text-slate-600">Memory Used</div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>Heap</span>
+                  <span>
+                    {Math.round(
+                      (healthData.memory.heapUsed /
+                        healthData.memory.heapTotal) *
+                        100,
+                    )}
+                    %
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.round((healthData.memory.heapUsed / healthData.memory.heapTotal) * 100)}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {error && (
@@ -196,7 +431,7 @@ const Dashboard = () => {
                       </div>
 
                       {/* Deployment Details Grid */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <div className="flex items-center space-x-2">
                           <Package className="w-4 h-4 text-slate-500" />
                           <div>
@@ -258,10 +493,10 @@ const Dashboard = () => {
                       )}
 
                       {/* Actions */}
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                         <a
                           href={`/deployment/${deployment.id}`}
-                          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                          className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                         >
                           <Eye className="w-4 h-4" />
                           <span>View Details</span>
@@ -269,7 +504,7 @@ const Dashboard = () => {
                         {deployment.status === "ready" && (
                           <a
                             href={`/deployment/${deployment.id}?preview`}
-                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+                            className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
                           >
                             <Play className="w-4 h-4" />
                             <span>Preview</span>
@@ -277,7 +512,7 @@ const Dashboard = () => {
                         )}
                         <a
                           href={`https://github.com/${deployment.owner}/${deployment.repo}`}
-                          className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors"
+                          className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors"
                           target="_blank"
                           rel="noopener noreferrer"
                           title="View repository on GitHub"
@@ -287,7 +522,7 @@ const Dashboard = () => {
                         </a>
                         <a
                           href={`https://github.com/${deployment.owner}/${deployment.repo}/commit/${deployment.commitSha}`}
-                          className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors"
+                          className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors"
                           target="_blank"
                           rel="noopener noreferrer"
                           title="View commit on GitHub"
@@ -298,7 +533,7 @@ const Dashboard = () => {
                         {deployment.metaType === "pull_request" && (
                           <a
                             href={`https://github.com/${deployment.owner}/${deployment.repo}/pull/${deployment.meta}`}
-                            className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors"
+                            className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors"
                             target="_blank"
                             rel="noopener noreferrer"
                             title="View pull request on GitHub"

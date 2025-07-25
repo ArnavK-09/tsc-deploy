@@ -1,15 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  Clock,
-  GitCommit,
-  Package,
-  Zap,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  ExternalLink,
-} from "lucide-react";
+import { Package, Zap, AlertCircle, Loader2 } from "lucide-react";
 import DeploymentDetails from "./DeploymentDetails";
 import JobList from "./JobList";
 import ArtifactList from "./ArtifactList";

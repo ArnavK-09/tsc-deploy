@@ -2,9 +2,7 @@ import {
   GitCommit,
   Clock,
   Package,
-  User,
   Calendar,
-  Zap,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -12,7 +10,6 @@ import {
   ExternalLink,
   Github,
   GitBranch,
-  Globe,
 } from "lucide-react";
 
 interface DeploymentDetailsProps {
