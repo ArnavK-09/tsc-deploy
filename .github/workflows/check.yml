@@ -1,4 +1,4 @@
-name: Format Check
+name: Format and Type Check
 
 on:
   workflow_dispatch:

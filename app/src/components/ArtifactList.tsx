@@ -71,7 +71,7 @@ const ArtifactList: React.FC<ArtifactListProps> = ({ jobs }) => {
     try {
       const res = await fetch(`/api/artifacts/${artifact.id}/download`);
       if (!res.ok) throw new Error("Failed to fetch circuit JSON");
-      const json = await res.json();
+      const json = await res.json() as object;
       setModalCircuitJson(json);
     } catch (err) {
       setModalCircuitJson("Error loading circuit JSON");

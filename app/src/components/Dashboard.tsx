@@ -74,7 +74,7 @@ const Dashboard = () => {
       try {
         const response = await fetch("/api/deployments?limit=50");
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as DeploymentsResponse;
           setDeploymentsData(data);
         } else {
           setError(`Failed to fetch deployments: ${response.status}`);
@@ -93,7 +93,7 @@ const Dashboard = () => {
       try {
         const response = await fetch("/api");
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as HealthData;
           setHealthData(data);
         } else {
           setHealthError(`Failed to fetch health data: ${response.status}`);
