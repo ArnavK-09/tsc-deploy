@@ -3,6 +3,7 @@
   "private": true,
   "description": "Vercel-like deployment platform for tscircuit projects",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "build": "bun run db:generate; cd app; bun x astro build",
     "build:action": "cd github-action && bun tsup",
@@ -20,10 +21,10 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@astrojs/vercel": "^8.2.2",
+    "@astrojs/vercel": "8.2.3",
     "@octokit/types": "^14.1.0",
     "@prisma/client": "^6.12.0",
-    "astro": "^5.11.1",
+    "astro": "5.12.3",
     "circuit-json-to-simple-3d": "^0.0.4",
     "circuit-to-svg": "^0.0.166",
     "dotenv": "^17.2.0",
