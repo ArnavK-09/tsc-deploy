@@ -3,7 +3,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import Dashboard from '../components/Dashboard';
 ---
 
-<BaseLayout>
-  <Fragment slot="title">Dashboard - </Fragment>
+<BaseLayout
+  title="Dashboard - TSCircuit Deploy"
+  description="Monitor and manage your TSCircuit deployments. View deployment status, circuit files, and build information."
+  ogTitle="TSCircuit Deploy Dashboard"
+  ogDescription="Circuit deployment platform dashboard for monitoring TSCircuit projects"
+>
   <Dashboard client:load />
 </BaseLayout>

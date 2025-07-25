@@ -3,7 +3,33 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import DeploymentPage from '../../components/DeploymentPage';
 
 const { id } = Astro.params;
+
+// Fetch deployment data for meta tags
+let title = "Deployment - TSCircuit Deploy";
+let description = "View deployment details and circuit files for this TSCircuit project.";
+let ogTitle = "TSCircuit Deployment";
+let ogDescription = description;
+
+try {
+  const response = await fetch(`${Astro.url.origin}/api/deployment/${id}`);
+  if (response.ok) {
+    const {deployment} = await response.json();
+    if (deployment) {
+      title = `${deployment.owner}/${deployment.repo} - Deployment ${id?.substring(0, 8)} - TSCircuit Deploy`;
+      description = `Deployment of ${deployment.owner}/${deployment.repo} with ${deployment.totalCircuitFiles || 0} circuit files. Status: ${deployment.status}.`;
+      ogTitle = `${deployment.owner}/${deployment.repo} - TSCircuit Deployment`;
+      ogDescription = `View the deployment details for ${deployment.owner}/${deployment.repo} on TSCircuit Deploy platform.`;
+    }
+  }
+} catch (error) {
+  console.error('Failed to fetch deployment for meta tags:', error);
+}
 ---
-<BaseLayout>
+<BaseLayout
+  title={title}
+  description={description}
+  ogTitle={ogTitle}
+  ogDescription={ogDescription}
+>
     <DeploymentPage id={String(id)} client:load />
 </BaseLayout>
