@@ -1,5 +1,9 @@
 ---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import DeploymentPage from '../../components/DeploymentPage';
+
 const { id } = Astro.params;
 ---
-
-<h1> {id}</h1>
+<BaseLayout>
+    <DeploymentPage id={String(id)} client:load />
+</BaseLayout>

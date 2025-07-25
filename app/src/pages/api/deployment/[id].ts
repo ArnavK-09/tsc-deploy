@@ -1,8 +1,8 @@
 import { prisma } from "../../../../../prisma";
-import { createErrorResponse, createSuccessResponse } from "@/utils/http";
+import { createErrorResponse } from "@/utils/http";
 import type { APIRoute } from "astro";
 
-export const GET: APIRoute = async ({ params, request }) => {
+export const GET: APIRoute = async ({ params }) => {
   try {
     const { id } = params;
 
@@ -76,11 +76,16 @@ export const GET: APIRoute = async ({ params, request }) => {
       })),
     };
 
-    return createSuccessResponse({
-      deployment: transformedDeployment,
-      totalJobs: deployment.buildJobs.length,
-      totalArtifacts: deployment.buildArtifacts.length,
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        deployment: transformedDeployment,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     console.error("Error fetching deployment details:", error);
     if (error instanceof Error) {
