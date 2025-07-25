@@ -1,4 +1,6 @@
 ---
+import "../styles/global.css";
+
 export interface Props {
   title?: string;
   description?: string;
@@ -52,7 +54,6 @@ const year = new Date().getFullYear();
     <link rel="canonical" href={ogUrl} />
     
     <link rel="icon" type="image/png" href={ogImage}/>
-    <link rel="stylesheet" href="/src/styles/global.css" />
   </head>
   <body class="bg-slate-50 text-slate-900 min-h-screen">
     <div class="min-h-screen flex flex-col">
