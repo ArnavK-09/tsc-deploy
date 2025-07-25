@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Package, Zap, AlertCircle, Loader2 } from "lucide-react";
+import { Package, Zap, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
 import DeploymentDetails from "./DeploymentDetails";
 import JobList from "./JobList";
 import ArtifactList from "./ArtifactList";
@@ -30,7 +30,6 @@ const DeploymentPage = ({ id }: { id: string }) => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex items-center space-x-3 text-slate-900">
           <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-          <span className="text-lg font-medium">Loading deployment...</span>
         </div>
       </div>
     );

@@ -61,17 +61,17 @@ const DeploymentDetails: React.FC<DeploymentDetailsProps> = ({
   const statusInfo = statusConfig[status] || statusConfig.pending;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-4 sm:space-y-6">
       {/* Status Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
           <div
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${statusInfo.bg} ${statusInfo.color} w-fit`}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${statusInfo.bg} ${statusInfo.color} w-fit flex-shrink-0`}
           >
             {statusInfo.icon}
             <span className="text-sm font-medium capitalize">{status}</span>
           </div>
-          <div className="text-slate-500 text-sm">
+          <div className="text-slate-500 text-sm truncate">
             {deployment.buildCompletedAt
               ? `Completed ${new Date(deployment.buildCompletedAt).toLocaleString()}`
               : `Created ${new Date(deployment.createdAt).toLocaleString()}`}
@@ -88,108 +88,76 @@ const DeploymentDetails: React.FC<DeploymentDetailsProps> = ({
       </div>
 
       {/* Repository Information */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">
-          Repository
-        </h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <Github className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-slate-500">Repository</div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium text-slate-900 break-all">
-                    {deployment.owner}/{deployment.repo}
-                  </span>
-                  <a
-                    href={`https://github.com/${deployment.owner}/${deployment.repo}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 transition-colors flex-shrink-0"
-                    title="View repository on GitHub"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-slate-900 flex items-center space-x-2">
+            <Github className="w-4 h-4" />
+            <span>Repository</span>
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="text-sm text-slate-600 flex-shrink-0">
+                Owner:
+              </span>
+              <span className="text-sm font-medium text-slate-900 truncate">
+                {deployment.owner}
+              </span>
             </div>
-
-            <div className="flex items-start space-x-3">
-              <GitCommit className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-slate-500">Commit</div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-mono text-blue-600 break-all">
-                    {deployment.commitSha
-                      ? deployment.commitSha.slice(0, 8)
-                      : "—"}
-                  </span>
-                  {deployment.commitSha && (
-                    <a
-                      href={`https://github.com/${deployment.owner}/${deployment.repo}/commit/${deployment.commitSha}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 transition-colors flex-shrink-0"
-                      title="View commit on GitHub"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-              </div>
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="text-sm text-slate-600 flex-shrink-0">
+                Repository:
+              </span>
+              <span className="text-sm font-medium text-slate-900 truncate">
+                {deployment.repo}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="text-sm text-slate-600 flex-shrink-0">
+                Commit:
+              </span>
+              <span className="text-sm font-mono text-slate-900 truncate">
+                {deployment.commitSha.substring(0, 7)}
+              </span>
             </div>
           </div>
+        </div>
 
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <Package className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-sm text-slate-500">Circuit Files</div>
-                <div className="font-medium text-slate-900">
-                  {deployment.totalCircuitFiles ?? 0}
-                </div>
-              </div>
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-slate-900 flex items-center space-x-2">
+            <Package className="w-4 h-4" />
+            <span>Circuit Files</span>
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-slate-600">Total Files:</span>
+              <span className="text-sm font-medium text-slate-900">
+                {deployment.totalCircuitFiles || 0}
+              </span>
             </div>
+          </div>
+        </div>
 
-            <div className="flex items-start space-x-3">
-              <GitBranch className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-slate-500">
-                  {deployment.metaType === "pull_request"
-                    ? "Pull Request"
-                    : "Branch"}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium text-slate-900 break-all">
-                    {deployment.metaType === "pull_request"
-                      ? `#${deployment.meta}`
-                      : deployment.meta}
-                  </span>
-                  {deployment.metaType === "pull_request" && (
-                    <a
-                      href={`https://github.com/${deployment.owner}/${deployment.repo}/pull/${deployment.meta}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 transition-colors flex-shrink-0"
-                      title="View pull request on GitHub"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                  {deployment.metaType === "push" && (
-                    <a
-                      href={`https://github.com/${deployment.owner}/${deployment.repo}/tree/${deployment.meta}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 transition-colors flex-shrink-0"
-                      title="View branch on GitHub"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-              </div>
+        <div className="space-y-3 sm:col-span-2 lg:col-span-1">
+          <h3 className="text-sm font-medium text-slate-900 flex items-center space-x-2">
+            <GitBranch className="w-4 h-4" />
+            <span>Branch/PR</span>
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="text-sm text-slate-600 flex-shrink-0">
+                Type:
+              </span>
+              <span className="text-sm font-medium text-slate-900 capitalize truncate">
+                {deployment.metaType?.replace("_", " ") || "Unknown"}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="text-sm text-slate-600 flex-shrink-0">
+                {deployment.metaType === "pull_request" ? "PR #" : "Branch:"}:
+              </span>
+              <span className="text-sm font-medium text-slate-900 truncate">
+                {deployment.meta || "—"}
+              </span>
             </div>
           </div>
         </div>

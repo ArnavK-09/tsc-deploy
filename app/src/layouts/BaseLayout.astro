@@ -57,32 +57,32 @@ const year = new Date().getFullYear();
   <body class="bg-slate-50 text-slate-900 min-h-screen">
     <div class="min-h-screen flex flex-col">
       <header class="w-full border-b border-slate-200 bg-white/95 backdrop-blur-sm sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <a href="/" class="select-none flex items-center space-x-3">
-            <img src="https://github.com/tscircuit.png" alt="TSCircuit" class="w-8 h-8 rounded-lg" />
-            <div>
-              <h1 class="text-xl font-semibold tracking-tight text-slate-900">TSCircuit Deploy</h1>
-              <p class="text-xs text-slate-600">Circuit deployment platform</p>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-center sm:justify-between">
+          <a href="/" class="select-none flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <img src="https://github.com/tscircuit.png" alt="TSCircuit" class="w-8 h-8 rounded-lg flex-shrink-0" />
+            <div class="min-w-0">
+              <h1 class="text-lg sm:text-xl font-semibold tracking-tight text-slate-900 truncate">TSCircuit Deploy</h1>
+              <p class="text-xs text-slate-600 hidden sm:block">Circuit deployment platform</p>
             </div>
           </a>
           <nav class="hidden md:flex items-center space-x-6">
           </nav>
         </div>
       </header>
-      <main class="flex-1">
+      <main class="flex-1 px-2 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <slot />
       </main>
-      <footer class="border-t border-slate-200 bg-white">
-        <div class="max-w-7xl mx-auto px-6 py-8">
+      <footer class="border-t border-slate-200 bg-white mt-8 sm:mt-12 lg:mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             <div class="flex items-center space-x-3">
-              <img src="https://github.com/tscircuit.png" alt="TSCircuit" class="w-6 h-6 rounded opacity-80" />
+              <img src="https://github.com/tscircuit.png" alt="TSCircuit" class="w-6 h-6 rounded opacity-80 flex-shrink-0" />
               <span class="text-sm text-slate-500">&copy; {year} TSCircuit. All rights reserved.</span>
             </div>
-            <div class="flex items-center space-x-6">
-              <a href="https://github.com/tscircuit" class="text-sm text-slate-500 hover:text-blue-600 transition-colors">GitHub</a>
-              <a href="/privacy" class="text-sm text-slate-500 hover:text-blue-600 transition-colors">Privacy</a>
-              <a href="/terms" class="text-sm text-slate-500 hover:text-blue-600 transition-colors">Terms</a>
+            <div class="flex items-center space-x-4 sm:space-x-6">
+              <a href="https://github.com/tscircuit" class="text-sm text-slate-500 hover:text-blue-600 transition-colors whitespace-nowrap">GitHub</a>
+              <a href="/privacy" class="text-sm text-slate-500 hover:text-blue-600 transition-colors whitespace-nowrap">Privacy</a>
+              <a href="/terms" class="text-sm text-slate-500 hover:text-blue-600 transition-colors whitespace-nowrap">Terms</a>
             </div>
           </div>
         </div>
