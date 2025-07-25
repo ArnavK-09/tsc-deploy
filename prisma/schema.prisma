@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum DeploymentStatus {
+  skipped
+  ready
+  error
+  pending
+}
+
+enum MetaType {
+  push
+  pull_request
+}
+
+enum JobStatus {
+  queued
+  processing
+  completed
+  failed
+  cancelled
+}
+
+model Deployment {
+  id                String            @id @db.VarChar(36)
+  owner             String
+  repo              String
+  commitSha         String            @map("commit_sha") @db.VarChar(40)
+  status            DeploymentStatus? @default(pending)
+  meta              String
+  metaType          MetaType          @map("meta_type")
+  buildCompletedAt  DateTime?         @map("build_completed_at")
+  buildDuration     Int?              @map("build_duration")
+  totalCircuitFiles Int?              @default(0) @map("circuit_count")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  snapshotResult    Json?             @map("snapshot_result")
+
+  // Relations
+  buildJobs      BuildJob[]
+  buildArtifacts BuildArtifact[]
+
+  @@map("deployments")
+}
+
+model BuildJob {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deploymentId String    @map("deployment_id") @db.VarChar(36)
+  status       JobStatus @default(queued)
+  priority     Int       @default(0)
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  retryCount   Int       @default(0) @map("retry_count")
+  errorMessage String?   @map("error_message")
+  queuedAt     DateTime  @default(now()) @map("queued_at")
+  progress     Int?      @default(0)
+  logs         String?
+  metadata     Json?
+
+  // Relations
+  deployment     Deployment      @relation(fields: [deploymentId], references: [id])
+  buildArtifacts BuildArtifact[]
+
+  @@map("build_jobs")
+}
+
+model BuildArtifact {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId        String?  @map("job_id") @db.Uuid
+  deploymentId String   @map("deployment_id") @db.VarChar(36)
+  fileName     String   @map("file_name")
+  filePath     String   @map("file_path")
+  fileSize     Int?     @map("file_size")
+  createdAt    DateTime @default(now()) @map("created_at")
+  circuitJson  Json?    @map("circuit_json")
+
+  // Relations
+  job        BuildJob?  @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@map("build_artifacts")
+}

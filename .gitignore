@@ -61,3 +61,5 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+generated

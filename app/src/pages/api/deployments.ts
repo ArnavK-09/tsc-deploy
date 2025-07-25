@@ -1,5 +1,4 @@
-import { db, deployments, buildJobs, buildArtifacts } from "../../../../db";
-import { desc, eq, and, sql } from "drizzle-orm";
+import { prisma } from "../../../../prisma";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import type { DeploymentView } from "../../../../shared/types";
 
@@ -17,11 +16,9 @@ export async function GET(context: { request: Request }) {
     const id = url.searchParams.get("id");
 
     if (id) {
-      const [deployment] = await db
-        .select()
-        .from(deployments)
-        .where(eq(deployments.id, id))
-        .limit(1);
+      const deployment = await prisma.deployment.findUnique({
+        where: { id },
+      });
 
       if (!deployment) {
         return createErrorResponse("Deployment not found", 404);
@@ -29,19 +26,15 @@ export async function GET(context: { request: Request }) {
 
       let artifactCount = 0;
       try {
-        const [job] = await db
-          .select({ id: buildJobs.id })
-          .from(buildJobs)
-          .where(eq(buildJobs.deploymentId, id))
-          .limit(1);
+        const job = await prisma.buildJob.findFirst({
+          where: { deploymentId: id },
+          select: { id: true },
+        });
 
         if (job) {
-          const [{ count }] = await db
-            .select({ count: sql<number>`cast(count(*) as integer)` })
-            .from(buildArtifacts)
-            .where(eq(buildArtifacts.jobId, job.id));
-
-          artifactCount = count || 0;
+          artifactCount = await prisma.buildArtifact.count({
+            where: { jobId: job.id },
+          });
         }
       } catch (error) {
         console.warn("Could not fetch artifact count:", error);
@@ -69,23 +62,20 @@ export async function GET(context: { request: Request }) {
       });
     }
 
-    const conditions = [];
-    if (owner) conditions.push(eq(deployments.owner, owner));
-    if (repo) conditions.push(eq(deployments.repo, repo));
-    if (status) conditions.push(eq(deployments.status, status as any));
+    const whereClause: any = {};
+    if (owner) whereClause.owner = owner;
+    if (repo) whereClause.repo = repo;
+    if (status) whereClause.status = status;
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const allDeployments = await db
-      .select()
-      .from(deployments)
-      .where(whereClause)
-      .orderBy(desc(deployments.createdAt))
-      .limit(limit)
-      .offset((page - 1) * limit);
+    const allDeployments = await prisma.deployment.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: (page - 1) * limit,
+    });
 
     const deploymentViews: DeploymentView[] = allDeployments.map(
-      (deployment) => ({
+      (deployment: any) => ({
         id: deployment.id,
         owner: deployment.owner,
         repo: deployment.repo,
@@ -100,10 +90,9 @@ export async function GET(context: { request: Request }) {
       }),
     );
 
-    const [{ count: totalCount }] = await db
-      .select({ count: sql<number>`cast(count(*) as integer)` })
-      .from(deployments)
-      .where(whereClause);
+    const totalCount = await prisma.deployment.count({
+      where: whereClause,
+    });
 
     const totalPages = Math.ceil(totalCount / limit);
     const hasNext = page < totalPages;

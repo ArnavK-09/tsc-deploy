@@ -376,8 +376,8 @@ async function waitForBuildCompletion(
         }
       } else {
         const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
-        core.warning(`⚠️ Build status check failed: ${errorMsg}`);
         consecutiveErrors++;
+        core.warning(`⚠️ Build status check failed: ${errorMsg}`);
 
         if (consecutiveErrors >= maxConsecutiveErrors) {
           throw new Error(
@@ -414,7 +414,8 @@ async function waitForBuildCompletion(
 
       if (
         errorMessage.includes("Build failed:") ||
-        errorMessage.includes("Build was cancelled")
+        errorMessage.includes("Build was cancelled") ||
+        errorMessage.includes("500")
       ) {
         throw error;
       }

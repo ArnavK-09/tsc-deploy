@@ -1,4 +1,4 @@
-import { JobQueue } from "../../../../utils/job-queue";
+import { JobQueue } from "../../../../shared/job-queue";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import { extractGitHubToken } from "@/utils/auth";
 

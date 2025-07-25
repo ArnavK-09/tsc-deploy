@@ -1,5 +1,4 @@
-import { db, buildArtifacts, buildJobs, deployments } from "../../../../db";
-import { eq, and } from "drizzle-orm";
+import { prisma } from "../../../../prisma";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 
 export async function GET(context: { request: Request }) {
@@ -10,11 +9,9 @@ export async function GET(context: { request: Request }) {
     const artifactId = url.searchParams.get("artifactId");
 
     if (artifactId) {
-      const [artifact] = await db
-        .select()
-        .from(buildArtifacts)
-        .where(eq(buildArtifacts.id, artifactId))
-        .limit(1);
+      const artifact = await prisma.buildArtifact.findUnique({
+        where: { id: artifactId },
+      });
 
       if (!artifact) {
         return createErrorResponse("Artifact not found", 404);
@@ -24,20 +21,18 @@ export async function GET(context: { request: Request }) {
     }
 
     if (deploymentId) {
-      const [job] = await db
-        .select({ id: buildJobs.id })
-        .from(buildJobs)
-        .where(eq(buildJobs.deploymentId, deploymentId))
-        .limit(1);
+      const job = await prisma.buildJob.findFirst({
+        where: { deploymentId },
+        select: { id: true },
+      });
 
       if (!job) {
         return createErrorResponse("No build job found for deployment", 404);
       }
 
-      const artifacts = await db
-        .select()
-        .from(buildArtifacts)
-        .where(and(eq(buildArtifacts.jobId, job.id)));
+      const artifacts = await prisma.buildArtifact.findMany({
+        where: { jobId: job.id },
+      });
 
       return createSuccessResponse({
         deploymentId,
@@ -48,10 +43,9 @@ export async function GET(context: { request: Request }) {
     }
 
     if (jobId) {
-      const artifacts = await db
-        .select()
-        .from(buildArtifacts)
-        .where(and(eq(buildArtifacts.jobId, jobId)));
+      const artifacts = await prisma.buildArtifact.findMany({
+        where: { jobId },
+      });
 
       return createSuccessResponse({
         jobId,
