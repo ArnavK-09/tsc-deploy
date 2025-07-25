@@ -1,5 +1,5 @@
 import { createSuccessResponse } from "@/utils/http";
-import { checkDatabaseConnection } from "../../../../db";
+import { checkDatabaseConnection } from "../../../../prisma";
 
 export async function GET() {
   try {

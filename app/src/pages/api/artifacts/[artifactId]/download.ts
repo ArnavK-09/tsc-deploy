@@ -1,10 +1,4 @@
-import {
-  db,
-  buildArtifacts,
-  deployments,
-  buildJobs,
-} from "../../../../../../db";
-import { eq } from "drizzle-orm";
+import { prisma } from "../../../../../../prisma";
 import { createErrorResponse } from "@/utils/http";
 
 export async function GET(context: {
@@ -14,23 +8,29 @@ export async function GET(context: {
   const { artifactId } = context.params;
 
   try {
-    const [result] = await db
-      .select({
-        artifact: buildArtifacts,
-        deploymentId: buildJobs.deploymentId,
-        snapshotResult: deployments.snapshotResult,
-      })
-      .from(buildArtifacts)
-      .innerJoin(buildJobs, eq(buildArtifacts.jobId, buildJobs.id))
-      .innerJoin(deployments, eq(buildJobs.deploymentId, deployments.id))
-      .where(eq(buildArtifacts.id, artifactId))
-      .limit(1);
+    const result = await prisma.buildArtifact.findUnique({
+      where: { id: artifactId },
+      include: {
+        job: {
+          select: {
+            deploymentId: true,
+          },
+        },
+        deployment: {
+          select: {
+            snapshotResult: true,
+          },
+        },
+      },
+    });
 
     if (!result) {
       return createErrorResponse("Artifact not found", 404);
     }
 
-    const { artifact, deploymentId, snapshotResult } = result;
+    const artifact = result;
+    const deploymentId = String(result.job?.deploymentId);
+    const snapshotResult = result.deployment?.snapshotResult;
 
     const snapshotData = snapshotResult as any;
     if (!snapshotData || !snapshotData.circuitFiles) {

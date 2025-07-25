@@ -1,4 +1,4 @@
-import { JobQueue } from "./job-queue";
+import { JobQueue } from "../shared/job-queue";
 
 let isInitialized = false;
 

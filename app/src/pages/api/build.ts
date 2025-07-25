@@ -1,8 +1,7 @@
 import { SimpleBuildRequestSchema } from "../../../../shared/types";
-import { db, deployments, withDatabaseErrorHandling } from "../../../../db";
-import type { NewDeployment } from "../../../../db";
-import { JobQueue } from "../../../../utils/job-queue";
-import type { BuildJobData } from "../../../../utils/job-queue";
+import { prisma, withDatabaseErrorHandling } from "../../../../prisma";
+import { JobQueue } from "../../../../shared/job-queue";
+import type { BuildJobData } from "../../../../shared/job-queue";
 import { createErrorResponse, createSuccessResponse } from "@/utils/http";
 import { extractGitHubToken } from "@/utils/auth";
 import { initializeServices } from "../../../../utils/startup";
@@ -29,7 +28,7 @@ export async function POST(context: { request: Request }) {
       );
     }
 
-    const newDeployment: NewDeployment = {
+    const newDeployment = {
       id: buildRequest.id,
       owner: buildRequest.owner,
       repo: buildRequest.repo,
@@ -38,12 +37,11 @@ export async function POST(context: { request: Request }) {
       commitSha: buildRequest.ref,
       buildDuration: null,
       buildCompletedAt: null,
-      snapshotResult: null,
-      status: "pending",
+      status: "pending" as const,
     };
 
     await withDatabaseErrorHandling(
-      () => db.insert(deployments).values(newDeployment),
+      () => prisma.deployment.create({ data: newDeployment }),
       "creating deployment record",
     );
 

@@ -1,5 +1,4 @@
-import { db, deployments } from "../../../../../../../db";
-import { eq } from "drizzle-orm";
+import { prisma } from "../../../../../../../prisma";
 import { SvgGenerator } from "../../../../../../../utils/svg-generator";
 import type { SvgType } from "../../../../../../../utils/svg-generator";
 import { createErrorResponse } from "@/utils/http";
@@ -19,11 +18,9 @@ export async function GET(context: {
   }
 
   try {
-    const [deployment] = await db
-      .select()
-      .from(deployments)
-      .where(eq(deployments.id, deploymentId))
-      .limit(1);
+    const deployment = await prisma.deployment.findUnique({
+      where: { id: deploymentId },
+    });
 
     if (!deployment) {
       return createErrorResponse("Deployment not found", 404);

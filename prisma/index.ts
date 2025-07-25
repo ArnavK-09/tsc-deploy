@@ -1,32 +1,33 @@
-import { drizzle } from "drizzle-orm/vercel-postgres";
-import { sql } from "@vercel/postgres";
-import { deployments, buildJobs, buildArtifacts } from "./schema";
+import { PrismaClient } from "@prisma/client";
 
-let dbInstance: ReturnType<typeof drizzle>;
+let prismaInstance: PrismaClient;
 
 try {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  dbInstance = drizzle(sql, {
-    logger: process.env.NODE_ENV === "development",
+  prismaInstance = new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "info", "warn", "error"]
+        : ["error"],
   });
 
-  console.log("✅ Database connection initialized");
+  console.log("✅ Prisma client initialized");
 } catch (error) {
-  console.error("❌ Failed to initialize database connection:", error);
+  console.error("❌ Failed to initialize Prisma client:", error);
   throw error;
 }
 
-export const db = dbInstance;
+export const prisma = prismaInstance;
 
 export async function checkDatabaseConnection(): Promise<{
   healthy: boolean;
   error?: string;
 }> {
   try {
-    await sql`SELECT 1 as test`;
+    await prisma.$queryRaw`SELECT 1 as test`;
     return { healthy: true };
   } catch (error) {
     const errorMessage =
@@ -67,11 +68,17 @@ export async function withDatabaseErrorHandling<T>(
   }
 }
 
-export { deployments, buildJobs, buildArtifacts };
+// Graceful shutdown
+process.on("beforeExit", async () => {
+  await prisma.$disconnect();
+});
 
-export type Deployment = typeof deployments.$inferSelect;
-export type NewDeployment = typeof deployments.$inferInsert;
-export type BuildJob = typeof buildJobs.$inferSelect;
-export type NewBuildJob = typeof buildJobs.$inferInsert;
-export type BuildArtifact = typeof buildArtifacts.$inferSelect;
-export type NewBuildArtifact = typeof buildArtifacts.$inferInsert;
+process.on("SIGINT", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});

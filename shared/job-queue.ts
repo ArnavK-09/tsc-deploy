@@ -1,24 +1,15 @@
-import { eq, desc, sql } from "drizzle-orm";
-import {
-  db,
-  buildJobs,
-  deployments,
-  buildArtifacts,
-  BuildJob,
-  NewBuildJob,
-  NewBuildArtifact,
-} from "../db";
-import { SnapshotProcessor, BuildProgress } from "./snapshot-processor";
-import { GitHubService } from "../shared/github.service";
-import { DEPLOY_URL, JOB_MAX_RETRIES } from "../shared/constants";
-import { generatePRComment } from "./pr-comment";
-import type { PRCommentData } from "./pr-comment";
-import { env } from "../shared/env";
+import { prisma } from "../prisma";
+import { SnapshotProcessor, BuildProgress } from "../utils/snapshot-processor";
+import { GitHubService } from "./github.service";
+import { DEPLOY_URL, JOB_MAX_RETRIES } from "./constants";
+import { generatePRComment } from "../utils/pr-comment";
+import type { PRCommentData } from "../utils/pr-comment";
+import { env } from "./env";
 import fs from "node:fs";
 import path from "node:path";
-import { FileHandler } from "./file-handler";
+import { FileHandler } from "../utils/file-handler";
 import { SnapshotResult } from "shared/types";
-
+import { BuildJob } from "@prisma/client";
 export interface BuildJobData {
   deploymentId: string;
   owner: string;
@@ -58,14 +49,14 @@ export class JobQueue {
     jobData: BuildJobData,
     priority: number = 0,
   ): Promise<string> {
-    const newJob: NewBuildJob = {
+    const newJob = {
       deploymentId: jobData.deploymentId,
-      status: "queued",
+      status: "queued" as const,
       priority,
-      metadata: jobData,
+      metadata: jobData as any,
     };
 
-    const [job] = await db.insert(buildJobs).values(newJob).returning();
+    const job = await prisma.buildJob.create({ data: newJob });
 
     this.startProcessing();
 
@@ -73,22 +64,19 @@ export class JobQueue {
   }
 
   async getBuildStatus(jobId: string): Promise<BuildJob | null> {
-    const [job] = await db
-      .select()
-      .from(buildJobs)
-      .where(eq(buildJobs.id, jobId))
-      .limit(1);
+    const job = await prisma.buildJob.findUnique({
+      where: { id: jobId },
+    });
 
-    return job || null;
+    return job;
   }
 
   async getQueueLength(): Promise<number> {
-    const [result] = await db
-      .select({ count: sql<number>`cast(count(*) as integer)` })
-      .from(buildJobs)
-      .where(eq(buildJobs.status, "queued"));
+    const count = await prisma.buildJob.count({
+      where: { status: "queued" },
+    });
 
-    return result.count;
+    return count;
   }
 
   private async startProcessing() {
@@ -121,28 +109,27 @@ export class JobQueue {
   }
 
   private async getNextJob(): Promise<BuildJob | null> {
-    const [job] = await db
-      .select()
-      .from(buildJobs)
-      .where(eq(buildJobs.status, "queued"))
-      .orderBy(desc(buildJobs.priority), buildJobs.queuedAt)
-      .limit(1);
+    const job = await prisma.buildJob.findFirst({
+      where: { status: "queued" },
+      orderBy: [{ priority: "desc" }, { queuedAt: "asc" }],
+    });
 
     if (!job) return null;
 
-    await db
-      .update(buildJobs)
-      .set({
+    const updatedJob = await prisma.buildJob.update({
+      where: { id: job.id },
+      data: {
         status: "processing",
         startedAt: new Date(),
-      })
-      .where(eq(buildJobs.id, job.id));
+      },
+    });
 
-    return { ...job, status: "processing" as const };
+    return updatedJob;
   }
 
   private async processJob(job: BuildJob) {
-    const jobData = job.metadata as BuildJobData;
+    // Cast to unknown first to safely convert the metadata to BuildJobData
+    const jobData = job.metadata as unknown as BuildJobData;
     let workingDirectory: string | null = null;
 
     try {
@@ -178,14 +165,14 @@ export class JobQueue {
       await this.finalizeBuild(job, jobData, snapshot);
       console.log(`Build finalized for job ${job.id}`);
 
-      await db
-        .update(buildJobs)
-        .set({
+      await prisma.buildJob.update({
+        where: { id: job.id },
+        data: {
           status: "completed",
           completedAt: new Date(),
           progress: 100,
-        })
-        .where(eq(buildJobs.id, job.id));
+        },
+      });
       console.log(`Job ${job.id} marked as completed in database`);
 
       console.log(`Job ${job.id} completed successfully`);
@@ -201,15 +188,15 @@ export class JobQueue {
         errorMessage.includes("repository may be private") ||
         errorMessage.includes("Archive URL may be invalid");
 
-      await db
-        .update(buildJobs)
-        .set({
+      await prisma.buildJob.update({
+        where: { id: job.id },
+        data: {
           status: "failed",
           completedAt: new Date(),
           errorMessage,
-          retryCount: sql`${buildJobs.retryCount} + 1`,
-        })
-        .where(eq(buildJobs.id, job.id));
+          retryCount: { increment: 1 },
+        },
+      });
 
       if (!isNonRetryable && job.retryCount < JOB_MAX_RETRIES) {
         console.log(
@@ -221,14 +208,14 @@ export class JobQueue {
         console.log(`Retrying job ${job.id} in ${delayMs}ms`);
 
         setTimeout(async () => {
-          await db
-            .update(buildJobs)
-            .set({
+          await prisma.buildJob.update({
+            where: { id: job.id },
+            data: {
               status: "queued",
               startedAt: null,
               completedAt: null,
-            })
-            .where(eq(buildJobs.id, job.id));
+            },
+          });
         }, delayMs);
       } else {
         if (isNonRetryable) {
@@ -421,7 +408,7 @@ export class JobQueue {
         `Saving ${snapshot.circuitFiles.length} circuit files as build artifacts`,
       );
 
-      const artifacts: NewBuildArtifact[] = snapshot.circuitFiles.map(
+      const artifacts = snapshot.circuitFiles.map(
         (file: any, index: number) => {
           const circuitJsonString = JSON.stringify(file.circuitJson, null, 2);
           const fileSize = Buffer.byteLength(circuitJsonString, "utf8");
@@ -439,7 +426,7 @@ export class JobQueue {
 
       // Save all artifacts to database
       if (artifacts.length > 0) {
-        await db.insert(buildArtifacts).values(artifacts);
+        await prisma.buildArtifact.createMany({ data: artifacts });
         console.log(
           `✅ Saved ${artifacts.length} circuit files as build artifacts`,
         );
@@ -476,25 +463,25 @@ export class JobQueue {
     console.log(
       `Updating deployment in database for deployment ID: ${jobData.deploymentId}`,
     );
-    await db
-      .update(deployments)
-      .set({
+    await prisma.deployment.update({
+      where: { id: jobData.deploymentId },
+      data: {
         snapshotResult: snapshot,
         buildDuration: totalTime,
         buildCompletedAt: new Date(),
         status: snapshot.success ? "ready" : "error",
         totalCircuitFiles: snapshot.circuitFiles?.length || 0,
-      })
-      .where(eq(deployments.id, jobData.deploymentId));
+      },
+    });
 
     // Update job with error message if snapshot failed
     if (!snapshot.success && snapshot.error) {
-      await db
-        .update(buildJobs)
-        .set({
+      await prisma.buildJob.update({
+        where: { id: job.id },
+        data: {
           errorMessage: snapshot.error,
-        })
-        .where(eq(buildJobs.id, job.id));
+        },
+      });
     }
 
     if (snapshot.success) {
@@ -631,13 +618,13 @@ export class JobQueue {
     const botOctokit = new GitHubService({ token: env.GITHUB_BOT_TOKEN });
 
     // Update deployment status
-    await db
-      .update(deployments)
-      .set({
+    await prisma.deployment.update({
+      where: { id: jobData.deploymentId },
+      data: {
         status: "error",
         buildCompletedAt: new Date(),
-      })
-      .where(eq(deployments.id, jobData.deploymentId));
+      },
+    });
 
     await userOctokit.createDeploymentStatus({
       owner: jobData.owner,
@@ -705,13 +692,23 @@ Please check your circuit files and try again.
     progress: number,
     message: string,
   ) {
-    await db
-      .update(buildJobs)
-      .set({
+    const logEntry = `[${new Date().toISOString()}] ${message}\n`;
+
+    // Get current job to append to existing logs
+    const currentJob = await prisma.buildJob.findUnique({
+      where: { id: jobId },
+      select: { logs: true },
+    });
+
+    const updatedLogs = (currentJob?.logs || "") + logEntry;
+
+    await prisma.buildJob.update({
+      where: { id: jobId },
+      data: {
         progress,
-        logs: sql`COALESCE(${buildJobs.logs}, '') || ${`[${new Date().toISOString()}] ${message}\n`}`,
-      })
-      .where(eq(buildJobs.id, jobId));
+        logs: updatedLogs,
+      },
+    });
   }
 
   private async cleanupWorkspace(workingDirectory: string) {
