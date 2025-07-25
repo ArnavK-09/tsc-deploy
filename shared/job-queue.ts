@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { FileHandler } from "../utils/file-handler";
 import { SnapshotResult } from "shared/types";
-import { $BuildJobPayload } from "generated/prisma/models";
+import { BuildJob } from "../prisma";
 export interface BuildJobData {
   deploymentId: string;
   owner: string;
@@ -63,9 +63,7 @@ export class JobQueue {
     return job.id;
   }
 
-  async getBuildStatus(
-    jobId: string,
-  ): Promise<$BuildJobPayload["scalars"] | null> {
+  async getBuildStatus(jobId: string): Promise<BuildJob | null> {
     const job = await prisma.buildJob.findUnique({
       where: { id: jobId },
     });
@@ -110,7 +108,7 @@ export class JobQueue {
     }
   }
 
-  private async getNextJob(): Promise<$BuildJobPayload["scalars"] | null> {
+  private async getNextJob(): Promise<BuildJob | null> {
     const job = await prisma.buildJob.findFirst({
       where: { status: "queued" },
       orderBy: [{ priority: "desc" }, { queuedAt: "asc" }],
@@ -129,7 +127,7 @@ export class JobQueue {
     return updatedJob;
   }
 
-  private async processJob(job: $BuildJobPayload["scalars"]) {
+  private async processJob(job: BuildJob) {
     // Cast to unknown first to safely convert the metadata to BuildJobData
     const jobData = job.metadata as unknown as BuildJobData;
     let workingDirectory: string | null = null;
@@ -378,10 +376,7 @@ export class JobQueue {
     );
   }
 
-  private async buildProject(
-    job: $BuildJobPayload["scalars"],
-    workingDirectory: string,
-  ) {
+  private async buildProject(job: BuildJob, workingDirectory: string) {
     const processor = new SnapshotProcessor(
       workingDirectory,
       (progress: BuildProgress) => {
@@ -396,7 +391,7 @@ export class JobQueue {
   }
 
   private async saveBuildArtifacts(
-    job: $BuildJobPayload["scalars"],
+    job: BuildJob,
     snapshot: SnapshotResult,
   ): Promise<void> {
     try {
@@ -442,7 +437,7 @@ export class JobQueue {
   }
 
   private async finalizeBuild(
-    job: $BuildJobPayload["scalars"],
+    job: BuildJob,
     jobData: BuildJobData,
     snapshot: SnapshotResult,
   ) {
@@ -615,7 +610,7 @@ export class JobQueue {
   }
 
   private async handleJobFailure(
-    job: $BuildJobPayload["scalars"],
+    job: BuildJob,
     jobData: BuildJobData,
     errorMessage: string,
   ) {

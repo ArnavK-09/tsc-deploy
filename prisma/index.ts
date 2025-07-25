@@ -68,6 +68,16 @@ export async function withDatabaseErrorHandling<T>(
   }
 }
 
+// Export types for convenience
+export type {
+  Deployment,
+  BuildJob,
+  BuildArtifact,
+  DeploymentStatus,
+  MetaType,
+  JobStatus,
+} from "../generated/prisma";
+
 // Graceful shutdown
 process.on("beforeExit", async () => {
   await prisma.$disconnect();
