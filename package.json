@@ -4,7 +4,7 @@
   "description": "Vercel-like deployment platform for tscircuit projects",
   "version": "1.0.0",
   "scripts": {
-    "build": "bun run db:generate && cd app && bun x astro build",
+    "build": "bun run db:generate; cd app; bun x astro build",
     "build:action": "cd github-action && bun tsup",
     "start": "cd app && bun x astro dev",
     "test": "bun test",
